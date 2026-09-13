@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { Badge, Card, PageHeader } from '@/components/ui'
 import { StartPlanButton } from '@/components/start-plan-button'
+import { PlanScheduleEditor } from '@/components/plan-schedule-editor'
 import { createClient, requireUser } from '@/lib/supabase/server'
 
 type PlanDetailRow = {
@@ -47,7 +48,7 @@ export default async function PlanDetailPage({
 
   const { data: active } = await supabase
     .from('user_plans')
-    .select('id, starts_on')
+    .select('id, starts_on, schedule')
     .eq('plan_id', row.id)
     .eq('active', true)
     .maybeSingle()
@@ -61,6 +62,14 @@ export default async function PlanDetailPage({
       />
 
       <div className="space-y-6">
+        {active ? (
+          <PlanScheduleEditor
+            userPlanId={active.id}
+            planDays={days.map((d) => ({ id: d.id, position: d.position, name: d.name }))}
+            initialSchedule={active.schedule}
+          />
+        ) : null}
+
         {days.map((day) => {
           const exercises = [...day.plan_day_exercises].sort((a, b) => a.position - b.position)
           return (

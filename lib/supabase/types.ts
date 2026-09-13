@@ -1,3 +1,5 @@
+import type { ScheduleSlot } from '@/lib/schedule'
+
 export type Profile = {
   id: string
   full_name: string | null
@@ -82,6 +84,7 @@ export type UserPlan = {
   plan_id: string
   starts_on: string
   active: boolean
+  schedule: ScheduleSlot[] | null
   created_at: string
 }
 
@@ -219,6 +222,7 @@ export interface Database {
           plan_id: string
           starts_on?: string
           active?: boolean
+          schedule?: ScheduleSlot[] | null
           created_at?: string
         }
         Update: Partial<UserPlan>

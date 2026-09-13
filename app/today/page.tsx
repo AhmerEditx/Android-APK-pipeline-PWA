@@ -3,13 +3,14 @@ import { Badge, EmptyState, PageHeader } from '@/components/ui'
 import { TodayChecklist } from '@/components/today-checklist'
 import type { TodaysExercises } from '@/components/today-checklist'
 import { createClient, requireUser } from '@/lib/supabase/server'
-import { REST, restSchedule } from '@/lib/schedule'
+import { REST, defaultScheduleForDays, nextTrainingSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { addDays, daysBetween, localDateISO } from '@/lib/utils'
 
 type ActivePlanRow = {
   id: string
   starts_on: string
   plan_id: string
+  schedule: ScheduleSlotList | null
   plans: {
     id: string
     name: string
@@ -48,7 +49,7 @@ export default async function TodayPage() {
 
   const { data: active } = await supabase
     .from('user_plans')
-    .select('id, starts_on, plan_id, plans(id, name, days_count, description)')
+    .select('id, starts_on, plan_id, schedule, plans(id, name, days_count, description)')
     .eq('user_id', user.id)
     .eq('active', true)
     .order('created_at', { ascending: false })
@@ -77,19 +78,53 @@ export default async function TodayPage() {
   const row = active as unknown as ActivePlanRow
   const today = localDateISO()
   const daysElapsed = Math.max(daysBetween(row.starts_on, today), 0)
-  const schedule = restSchedule(row.plans.days_count)
+
+  const [{ data: planDaysData }, { data: lastAttempts }] = await Promise.all([
+    supabase
+      .from('plan_days')
+      .select('id, name, position, plan_day_exercises(*, exercises(id, name, muscle_group))')
+      .eq('plan_id', row.plans.id)
+      .order('position', { ascending: true }),
+    supabase
+      .from('workouts')
+      .select('date, workout_exercises(exercise_id, sets(weight_kg, reps, is_warmup))')
+      .eq('user_id', user.id)
+      .lt('date', today)
+      .gte('date', addDays(today, -13))
+      .order('date', { ascending: false })
+      .limit(30),
+  ])
+
+  const planDayRows = (planDaysData ?? []) as unknown as PlanDayRow[]
+  const dayById = new Map(planDayRows.map((d) => [d.id, d]))
+
+  const saved = row.schedule
+  const schedule: ScheduleSlotList =
+    saved && saved.length > 0 ? saved : defaultScheduleForDays(planDayRows)
+
+  if (schedule.length === 0) {
+    return (
+      <div>
+        <PageHeader title="Today's workout" description="Check off your prescribed session." />
+        <EmptyState
+          title="No sessions scheduled"
+          description={`"${row.plans.name}" has no schedule yet. Open the plan and customise your cycle.`}
+        />
+      </div>
+    )
+  }
+
   const slotIndex = daysElapsed % schedule.length
   const slot = schedule[slotIndex]
 
-  if (slot === REST) {
-    const nextPosition = schedule[(slotIndex + 1) % schedule.length] as number
-    const { data: nextDay } = await supabase
-      .from('plan_days')
-      .select('name, position')
-      .eq('plan_id', row.plans.id)
-      .eq('position', nextPosition)
-      .maybeSingle()
-    const nextName = (nextDay as unknown as { name: string } | null)?.name
+  if (slot.kind === REST) {
+    const next = nextTrainingSlot(schedule, slotIndex)
+    const nextLabel =
+      next && next.slot.kind === 'day'
+        ? `Day ${dayById.get(next.slot.planDayId)?.position ?? ''} · ${dayById.get(next.slot.planDayId)?.name ?? 'next session'}`
+        : next?.slot.kind === 'custom'
+          ? next.slot.name
+          : undefined
 
     return (
       <div>
@@ -100,13 +135,11 @@ export default async function TodayPage() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 sm:p-8">
           <div className="flex items-center gap-2">
             <Badge tone="accent">Rest</Badge>
-            <Badge>{nextName ? `Next: Day ${nextPosition} · ${nextName}` : 'Rest day'}</Badge>
+            {nextLabel ? <Badge>Next: {nextLabel}</Badge> : null}
           </div>
           <h2 className="mt-4 text-xl font-bold text-zinc-50">Rest &amp; recover today.</h2>
           <p className="mt-1 text-sm text-zinc-500">
-            {nextName
-              ? `Your next session is Day ${nextPosition} of ${row.plans.days_count} · ${nextName}.`
-              : `Day ${nextPosition} of ${row.plans.days_count} is next.`}{' '}
+            {nextLabel ? `Your next session is ${nextLabel}. ` : ''}
             Your next workout will appear here automatically.
           </p>
           <Link
@@ -120,38 +153,43 @@ export default async function TodayPage() {
     )
   }
 
-  const position = slot
+  if (slot.kind === 'custom') {
+    return (
+      <div>
+        <PageHeader title="Today's workout" description={`${row.plans.name} · ${slot.name}`} />
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 sm:p-8">
+          <div className="flex items-center gap-2">
+            <Badge tone="accent">{slot.name}</Badge>
+            <Badge>No preset exercises</Badge>
+          </div>
+          <h2 className="mt-4 text-xl font-bold text-zinc-50">{slot.name} — it&apos;s your call.</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            This is an extra working day you added to your schedule. Log whatever feels right.
+          </p>
+          <Link
+            href="/workouts/new"
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300"
+          >
+            Log this workout
+          </Link>
+        </div>
+      </div>
+    )
+  }
 
-  const [{ data: planDay }, { data: lastAttempts }] = await Promise.all([
-    supabase
-      .from('plan_days')
-      .select('id, name, position, plan_day_exercises(*, exercises(id, name, muscle_group))')
-      .eq('plan_id', row.plans.id)
-      .eq('position', position)
-      .maybeSingle(),
-    supabase
-      .from('workouts')
-      .select('date, workout_exercises(exercise_id, sets(weight_kg, reps, is_warmup))')
-      .eq('user_id', user.id)
-      .lt('date', today)
-      .gte('date', addDays(today, -13))
-      .order('date', { ascending: false })
-      .limit(30),
-  ])
-
-  if (!planDay) {
+  const day = dayById.get(slot.planDayId)
+  if (!day) {
     return (
       <div>
         <PageHeader title="Today's workout" description="Check off your prescribed session." />
         <EmptyState
-          title={`Nothing scheduled for day ${position}`}
-          description={`"${row.plans.name}" has ${row.plans.days_count} days — day ${position} is missing. Start the plan again to reset the cycle.`}
+          title="Session unavailable"
+          description={`"${row.plans.name}" is missing a session in your schedule. Open the plan and reset the cycle.`}
         />
       </div>
     )
   }
 
-  const day = planDay as unknown as PlanDayRow
   const exercises = [...day.plan_day_exercises].sort((a, b) => a.position - b.position)
 
   const attempts = (lastAttempts ?? []) as unknown as LastAttemptRow[]
@@ -189,7 +227,7 @@ export default async function TodayPage() {
     <div>
       <PageHeader
         title="Today's workout"
-        description={`${row.plans.name} · Day ${position} of ${row.plans.days_count}`}
+        description={`${row.plans.name} · ${day.name}`}
         action={
           <div className="flex items-center gap-2">
             <Badge tone="accent">{day.name}</Badge>

@@ -2,7 +2,7 @@ import { Badge, Card, PageHeader } from '@/components/ui'
 import { AdminUserActions } from '@/components/admin-user-actions'
 import { BroadcastForm } from '@/components/admin-broadcast-form'
 import { createClient, requireAdmin } from '@/lib/supabase/server'
-import { REST, restSchedule } from '@/lib/schedule'
+import { REST, restSchedulePositions, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { daysBetween, formatDate, localDateISO } from '@/lib/utils'
 
 type UserRow = {
@@ -16,6 +16,7 @@ type UserRow = {
 type UserPlanRow = {
   user_id: string
   starts_on: string
+  schedule: ScheduleSlotList | null
   plans: { name: string; days_count: number } | null
 }
 
@@ -44,7 +45,7 @@ export default async function AdminPage() {
         .order('created_at', { ascending: false }),
       supabase
         .from('user_plans')
-        .select('user_id, starts_on, plans(name, days_count)')
+        .select('user_id, starts_on, schedule, plans(name, days_count)')
         .eq('active', true),
       supabase.from('workouts').select('user_id, date').order('date', { ascending: false }),
       supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50),
@@ -75,8 +76,15 @@ export default async function AdminPage() {
     const p = planMap.get(userId)
     if (!p?.plans) return null
     const daysElapsed = Math.max(daysBetween(p.starts_on, today), 0)
-    const schedule = restSchedule(p.plans.days_count)
-    const slot = schedule[daysElapsed % schedule.length]
+    const saved = p.schedule
+    if (saved && saved.length > 0) {
+      const slot = saved[daysElapsed % saved.length] as ScheduleSlot
+      if (slot.kind === REST) return `${p.plans.name} · Rest day`
+      if (slot.kind === 'custom') return `${p.plans.name} · ${slot.name}`
+      return `${p.plans.name} · Training day`
+    }
+    const positions = restSchedulePositions(p.plans.days_count)
+    const slot = positions[daysElapsed % positions.length]
     if (slot === REST) return `${p.plans.name} · Rest day`
     return `${p.plans.name} · Day ${slot} of ${p.plans.days_count}`
   }
