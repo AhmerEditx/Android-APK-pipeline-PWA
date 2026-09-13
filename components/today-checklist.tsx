@@ -1,0 +1,304 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import { Badge, Button, Card, Field, Input } from '@/components/ui'
+import { formatDate, formatNumber } from '@/lib/utils'
+
+export type TodaysExercises = Array<{
+  pdeId: string
+  exerciseId: string
+  name: string
+  muscleGroup: string
+  prescribedSets: number
+  prescribedReps: string | null
+  targetWeight: string | null
+  last: {
+    date: string
+    sets: Array<{ weight_kg: number | null; reps: number | null; is_warmup: boolean }>
+  } | null
+}>
+
+type DraftSet = { done: boolean; weight: string; reps: string }
+type DraftExercise = {
+  exerciseId: string
+  name: string
+  muscleGroup: string
+  prescription: string
+  last: TodaysExercises[number]['last']
+  sets: DraftSet[]
+}
+
+function toNumber(raw: string): number | null {
+  const trimmed = raw.trim()
+  if (trimmed === '') return null
+  const n = Number(trimmed)
+  return Number.isNaN(n) ? null : n
+}
+
+function seedSets(sets: number): DraftSet[] {
+  const count = Math.max(sets, 1)
+  return Array.from({ length: count }, () => ({ done: false, weight: '', reps: '' }))
+}
+
+export function TodayChecklist({
+  planDayId,
+  dayName,
+  today,
+  exercises,
+}: {
+  planDayId: string
+  dayName: string
+  today: string
+  exercises: TodaysExercises
+}) {
+  const router = useRouter()
+  const [date, setDate] = useState(today)
+  const [notes, setNotes] = useState('')
+  const [added, setAdded] = useState<DraftExercise[]>(() =>
+    exercises.map((ex) => ({
+      exerciseId: ex.exerciseId,
+      name: ex.name,
+      muscleGroup: ex.muscleGroup,
+      prescription: `${ex.prescribedSets} × ${ex.prescribedReps ?? '—'}`,
+      last: ex.last,
+      sets: seedSets(ex.prescribedSets),
+    }))
+  )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [savedId, setSavedId] = useState<string | null>(null)
+
+  function updateSet(
+    exIndex: number,
+    setIndex: number,
+    patch: Partial<DraftSet>
+  ) {
+    setAdded((prev) =>
+      prev.map((ex, i) =>
+        i === exIndex
+          ? { ...ex, sets: ex.sets.map((s, j) => (j === setIndex ? { ...s, ...patch } : s)) }
+          : ex
+      )
+    )
+  }
+
+  function addSet(exIndex: number) {
+    setAdded((prev) =>
+      prev.map((ex, i) => (i === exIndex ? { ...ex, sets: [...ex.sets, { done: false, weight: '', reps: '' }] } : ex))
+    )
+  }
+
+  function removeSet(exIndex: number, setIndex: number) {
+    setAdded((prev) =>
+      prev.map((ex, i) =>
+        i === exIndex ? { ...ex, sets: ex.sets.filter((_, j) => j !== setIndex) } : ex
+      )
+    )
+  }
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault()
+    const supabase = createClient()
+
+    const exercisesToSave = added.filter((ex) =>
+      ex.sets.some((s) => toNumber(s.weight) != null || toNumber(s.reps) != null)
+    )
+
+    if (exercisesToSave.length === 0) {
+      setError('Enter a weight or rep count for at least one set to save.')
+      return
+    }
+
+    setSaving(true)
+    setError(null)
+
+    try {
+      const { data, error: workoutErr } = await supabase
+        .from('workouts')
+        .insert({ date, notes: notes.trim() || null, plan_day_id: planDayId })
+        .select('id')
+        .single()
+      if (workoutErr) throw new Error(workoutErr.message)
+      const workoutId = data.id
+
+      for (let i = 0; i < exercisesToSave.length; i++) {
+        const ex = exercisesToSave[i]
+        const { data: we, error: weErr } = await supabase
+          .from('workout_exercises')
+          .insert({ workout_id: workoutId, exercise_id: ex.exerciseId, position: i })
+          .select('id')
+          .single()
+        if (weErr) throw new Error(weErr.message)
+
+        let setNumber = 1
+        for (const s of ex.sets) {
+          const weight = toNumber(s.weight)
+          const reps = toNumber(s.reps)
+          if (weight == null && reps == null) continue
+          const { error: setErr } = await supabase.from('sets').insert({
+            workout_exercise_id: we.id,
+            set_number: setNumber++,
+            weight_kg: weight,
+            reps,
+          })
+          if (setErr) throw new Error(setErr.message)
+        }
+      }
+
+      setSavedId(workoutId)
+      router.refresh()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save workout.')
+      setSaving(false)
+    }
+  }
+
+  if (savedId) {
+    return (
+      <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+        <p className="text-lg font-semibold text-zinc-200">Workout saved 🎉</p>
+        <p className="max-w-sm text-sm text-zinc-500">
+          Nice work on {dayName}. Come back tomorrow for the next day of your plan.
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <Button variant="secondary" onClick={() => router.push(`/history/${savedId}`)}>
+            View workout
+          </Button>
+          <Button variant="ghost" onClick={() => router.push('/today')}>
+            Back to today
+          </Button>
+        </div>
+      </Card>
+    )
+  }
+
+  const gridCols =
+    'grid grid-cols-[2.25rem_1.75rem_1fr_1fr_1.75rem] items-center gap-2 sm:grid-cols-[3rem_2.5rem_1fr_1fr_2.5rem]'
+
+  return (
+    <form onSubmit={handleSave} className="space-y-8">
+      <Card className="p-5 sm:p-6">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Date">
+            <Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </Field>
+          <Field label="Notes (optional)">
+            <Input
+              type="text"
+              placeholder="Felt strong today 💪"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </Field>
+        </div>
+      </Card>
+
+      <div className="space-y-4">
+        {added.map((ex, exIndex) => (
+          <Card key={ex.exerciseId} className="p-5 sm:p-6">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-semibold text-zinc-50">{ex.name}</h3>
+                <Badge>{ex.muscleGroup}</Badge>
+                <Badge tone="accent">{ex.prescription}</Badge>
+              </div>
+            </div>
+
+            {ex.last && ex.last.sets.length > 0 ? (
+              <p className="mb-4 text-xs text-zinc-500">
+                Last time ({formatDate(ex.last.date)}):{' '}
+                {ex.last.sets
+                  .map(
+                    (set) =>
+                      `${set.weight_kg != null ? `${formatNumber(set.weight_kg, 2)} kg` : '—'} × ${
+                        set.reps ?? '—'
+                      }`
+                  )
+                  .join(' · ')}
+              </p>
+            ) : (
+              <p className="mb-4 text-xs text-zinc-600">First time doing this in the past 2 weeks.</p>
+            )}
+
+            <div className={`${gridCols} pb-2 text-xs font-medium uppercase tracking-wide text-zinc-500`}>
+              <span>Done</span>
+              <span>Set</span>
+              <span>Weight (kg)</span>
+              <span>Reps</span>
+              <span />
+            </div>
+
+            <div className="space-y-2">
+              {ex.sets.map((s, setIndex) => (
+                <div key={setIndex} className={gridCols}>
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={s.done}
+                      onChange={(e) => updateSet(exIndex, setIndex, { done: e.target.checked })}
+                      className="h-4 w-4 accent-lime-400"
+                    />
+                  </label>
+                  <span className={`text-sm font-medium ${s.done ? 'text-lime-400' : 'text-zinc-400'}`}>
+                    {setIndex + 1}
+                  </span>
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.5"
+                    min="0"
+                    placeholder="0"
+                    value={s.weight}
+                    onChange={(e) => updateSet(exIndex, setIndex, { weight: e.target.value })}
+                  />
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    step="1"
+                    min="0"
+                    placeholder="0"
+                    value={s.reps}
+                    onChange={(e) => updateSet(exIndex, setIndex, { reps: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSet(exIndex, setIndex)}
+                    disabled={ex.sets.length === 1}
+                    className="text-sm text-zinc-600 transition-colors hover:text-red-400 disabled:pointer-events-none disabled:opacity-30"
+                    aria-label="Remove set"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="mt-4"
+              onClick={() => addSet(exIndex)}
+            >
+              + Add set
+            </Button>
+          </Card>
+        ))}
+      </div>
+
+      {error ? (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="flex items-center gap-3">
+        <Button type="submit" disabled={saving} variant="primary">
+          {saving ? 'Saving…' : 'Save workout'}
+        </Button>
+      </div>
+    </form>
+  )
+}

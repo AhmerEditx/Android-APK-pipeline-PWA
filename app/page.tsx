@@ -101,6 +101,27 @@ export default async function DashboardPage() {
         />
       </div>
 
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <Link href="/today" className="group">
+          <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
+            <p className="font-semibold text-zinc-100">Today&apos;s plan</p>
+            <p className="mt-1 text-sm text-zinc-500">Check off your prescribed session.</p>
+          </Card>
+        </Link>
+        <Link href="/plans" className="group">
+          <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
+            <p className="font-semibold text-zinc-100">Training plans</p>
+            <p className="mt-1 text-sm text-zinc-500">3 to 7-day splits with a baked-in routine.</p>
+          </Card>
+        </Link>
+        <Link href="/messages" className="group">
+          <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
+            <p className="font-semibold text-zinc-100">Messages</p>
+            <p className="mt-1 text-sm text-zinc-500">Notes from the gym owner.</p>
+          </Card>
+        </Link>
+      </div>
+
       <div className="mt-10">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-zinc-100">Recent workouts</h2>

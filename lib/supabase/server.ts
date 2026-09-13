@@ -42,3 +42,15 @@ export async function requireUser() {
   if (!user) redirect('/login')
   return user
 }
+
+export async function requireAdmin() {
+  const user = await requireUser()
+  const supabase = await createClient()
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (!profile?.is_admin) redirect('/')
+  return user
+}

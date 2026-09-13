@@ -94,8 +94,8 @@ function WorkoutSummary({ initial, onEdit }: { initial: InitialWorkoutData; onEd
         ) : null}
 
         <div className="space-y-6">
-          {initial.exercises.map((ex) => (
-            <div key={ex.weId}>
+          {initial.exercises.map((ex, i) => (
+            <div key={`${ex.weId}-${i}`}>
               <p className="mb-2 font-semibold text-zinc-100">{ex.exercise.name}</p>
               {ex.sets.length === 0 ? (
                 <p className="text-sm text-zinc-600">No sets logged.</p>

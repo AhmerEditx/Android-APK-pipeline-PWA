@@ -2,6 +2,8 @@ export type Profile = {
   id: string
   full_name: string | null
   height_cm: number | null
+  email: string | null
+  is_admin: boolean
   created_at: string
   updated_at: string
 }
@@ -20,6 +22,7 @@ export type Workout = {
   user_id: string
   date: string
   notes: string | null
+  plan_day_id: string | null
   created_at: string
 }
 
@@ -47,6 +50,50 @@ export type BodyMeasurement = {
   body_fat_pct: number | null
 }
 
+export type Plan = {
+  id: string
+  name: string
+  description: string | null
+  days_count: number
+  is_public: boolean
+  created_at: string
+}
+
+export type PlanDay = {
+  id: string
+  plan_id: string
+  name: string
+  position: number
+}
+
+export type PlanDayExercise = {
+  id: string
+  plan_day_id: string
+  exercise_id: string
+  position: number
+  prescribed_sets: number
+  prescribed_reps: string | null
+  target_weight: string | null
+}
+
+export type UserPlan = {
+  id: string
+  user_id: string
+  plan_id: string
+  starts_on: string
+  active: boolean
+  created_at: string
+}
+
+export type Message = {
+  id: string
+  recipient_id: string
+  subject: string
+  body: string
+  created_at: string
+  read_at: string | null
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -56,6 +103,8 @@ export interface Database {
           id: string
           full_name?: string | null
           height_cm?: number | null
+          email?: string | null
+          is_admin?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -82,6 +131,7 @@ export interface Database {
           user_id?: string
           date?: string
           notes?: string | null
+          plan_day_id?: string | null
           created_at?: string
         }
         Update: Partial<Workout>
@@ -121,6 +171,70 @@ export interface Database {
           body_fat_pct?: number | null
         }
         Update: Partial<BodyMeasurement>
+        Relationships: []
+      }
+      plans: {
+        Row: Plan
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          days_count: number
+          is_public?: boolean
+          created_at?: string
+        }
+        Update: Partial<Plan>
+        Relationships: []
+      }
+      plan_days: {
+        Row: PlanDay
+        Insert: {
+          id?: string
+          plan_id: string
+          name: string
+          position?: number
+        }
+        Update: Partial<PlanDay>
+        Relationships: []
+      }
+      plan_day_exercises: {
+        Row: PlanDayExercise
+        Insert: {
+          id?: string
+          plan_day_id: string
+          exercise_id: string
+          position?: number
+          prescribed_sets?: number
+          prescribed_reps?: string | null
+          target_weight?: string | null
+        }
+        Update: Partial<PlanDayExercise>
+        Relationships: []
+      }
+      user_plans: {
+        Row: UserPlan
+        Insert: {
+          id?: string
+          user_id?: string
+          plan_id: string
+          starts_on?: string
+          active?: boolean
+          created_at?: string
+        }
+        Update: Partial<UserPlan>
+        Relationships: []
+      }
+      messages: {
+        Row: Message
+        Insert: {
+          id?: string
+          recipient_id: string
+          subject: string
+          body: string
+          created_at?: string
+          read_at?: string | null
+        }
+        Update: Partial<Message>
         Relationships: []
       }
     }

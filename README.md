@@ -10,6 +10,21 @@ A full-stack gym tracker built with **Next.js 16**, **Supabase** (Postgres + Aut
 - **History** — browse every session, view full details, edit sets/exercises, or delete a workout.
 - **Progress charts** — body-weight trend, training volume per session, and top working weight per exercise.
 - **Body stats** — log weight and optional body-fat %.
+- **Training plans** — pre-made 3/4/5/6/7-day splits (incl. 6-day Push/Pull/Legs/Abs/Upper/Lower); one click starts a program.
+- **"Today" checkbook** — see the prescribed session, tick off sets as you lift, and compare against your last performance.
+- **Admin panel** — only the gym owner sees it. Every member's email, joined date, active plan + current day, workout count and last session; promote/demote admins; message one user **or broadcast to everyone**; reset a member's password.
+- **Messages** — members read owner messages in-app with an unread badge in the nav.
+- **Installable (PWA)** — web app manifest, touch/home-screen icons, and a service worker (asset caching + offline page fallback). Android/iOS users can "Add to Home Screen" and run it full-screen like a native app.
+
+## Generating icons
+
+Icons live in `public/icons/`. Regenerate them (or tweak colors/shapes in `scripts/generate-icons.mjs`) with:
+
+```bash
+node scripts/generate-icons.mjs
+```
+
+The service worker only registers in **production** builds (`npm run build && npm run start`, or Vercel), not in `npm run dev`.
 
 ## Tech stack
 
@@ -21,6 +36,7 @@ A full-stack gym tracker built with **Next.js 16**, **Supabase** (Postgres + Aut
 | Database  | Supabase (Postgres + Row Level Security)|
 | Auth      | Supabase Auth (`@supabase/ssr`)         |
 | Charts    | Recharts                                |
+| PWA       | Manifest + hand-rolled service worker   |
 | Hosting   | Vercel                                  |
 
 ## Local setup
@@ -31,7 +47,12 @@ A full-stack gym tracker built with **Next.js 16**, **Supabase** (Postgres + Aut
    npm install
    ```
 
-2. **Create a Supabase project** at <https://supabase.com/dashboard> and run `supabase/schema.sql` in the **SQL Editor**. This creates the tables, RLS policies, triggers, and seeds the exercise catalog.
+2. **Create a Supabase project** at <https://supabase.com/dashboard> and run the migration files in the **SQL Editor**, in order:
+   - `supabase/migrations/0001_init.sql` — core tables, RLS policies, triggers, exercise catalog.
+   - `supabase/migrations/0002_plans_messages.sql` — plans, plan days, messages, admin flag, plan seeds.
+   - `supabase/migrations/0003_admin_insights.sql` — lets the admin see every user's plan and workout stats.
+
+   The **first account** that signs up is automatically made an **admin** (sees `/admin` for emails + messaging).
 
 3. **Configure environment variables** — copy `.env.local.example` to `.env.local` and fill in your project values (Project Settings → API):
 
@@ -42,7 +63,10 @@ A full-stack gym tracker built with **Next.js 16**, **Supabase** (Postgres + Aut
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
    ```
+
+   `SUPABASE_SERVICE_ROLE_KEY` is **server-only** (never exposed to the browser) and powers the admin **Reset password** feature. Grab it under **Settings → API → service_role**. If you skip it, everything works except password resets. Add it to Vercel too.
 
 4. **Run the dev server**
 
@@ -73,6 +97,7 @@ git push -u origin main
 2. Add the environment variables (Production, Preview, Development):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (optional — only used by the admin password reset)
 3. Click **Deploy**.
 
 ### 3. Finish Supabase auth config
