@@ -41,7 +41,9 @@ jobs:
           yes | sdkmanager --licenses > /dev/null || true
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
         working-directory: android
 
       - name: Detect signing secrets
@@ -67,7 +69,9 @@ jobs:
 
       - name: Build signed release APK (only when secrets set)
         if: steps.detect.outputs.present == 'true'
-        run: ./gradlew assembleRelease
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
         working-directory: android
 
       - name: Upload APKs
