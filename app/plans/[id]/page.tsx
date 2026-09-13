@@ -62,13 +62,11 @@ export default async function PlanDetailPage({
       />
 
       <div className="space-y-6">
-        {active ? (
-          <PlanScheduleEditor
-            userPlanId={active.id}
-            planDays={days.map((d) => ({ id: d.id, position: d.position, name: d.name }))}
-            initialSchedule={active.schedule}
-          />
-        ) : null}
+        <PlanScheduleEditor
+          userPlanId={active?.id ?? null}
+          planDays={days.map((d) => ({ id: d.id, position: d.position, name: d.name }))}
+          initialSchedule={active?.schedule ?? null}
+        />
 
         {days.map((day) => {
           const exercises = [...day.plan_day_exercises].sort((a, b) => a.position - b.position)

@@ -13,11 +13,12 @@ export function PlanScheduleEditor({
   planDays,
   initialSchedule,
 }: {
-  userPlanId: string
+  userPlanId: string | null
   planDays: PlanDayInfo[]
   initialSchedule: ScheduleSlotList | null | undefined
 }) {
   const router = useRouter()
+  const started = userPlanId !== null
   const [slots, setSlots] = useState<ScheduleSlotList>(
     initialSchedule && initialSchedule.length > 0
       ? initialSchedule
@@ -44,10 +45,14 @@ export function PlanScheduleEditor({
   }
 
   async function save() {
+    if (!userPlanId) return
     setSaving(true)
     setError(null)
     const supabase = createClient()
-    const { error: err } = await supabase.from('user_plans').update({ schedule: slots }).eq('id', userPlanId)
+    const { error: err } = await supabase
+      .from('user_plans')
+      .update({ schedule: slots })
+      .eq('id', userPlanId)
     if (err) {
       setError(err.message)
       setSaving(false)
@@ -85,12 +90,16 @@ export function PlanScheduleEditor({
               ) : slot.kind === 'custom' ? (
                 <>
                   <Badge tone="accent">+</Badge>
-                  <input
-                    value={slot.name}
-                    onChange={(e) => renameCustom(index, e.target.value)}
-                    placeholder="Day name"
-                    className="w-40 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50"
-                  />
+                  {started ? (
+                    <input
+                      value={slot.name}
+                      onChange={(e) => renameCustom(index, e.target.value)}
+                      placeholder="Day name"
+                      className="w-40 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50"
+                    />
+                  ) : (
+                    <span className="text-sm font-medium text-zinc-100">{slot.name}</span>
+                  )}
                   <Badge tone="muted">Extra</Badge>
                 </>
               ) : (
@@ -102,7 +111,7 @@ export function PlanScheduleEditor({
                 </>
               )}
 
-              {slot.kind !== 'day' ? (
+              {started && slot.kind !== 'day' ? (
                 <button
                   onClick={() => removeAt(index)}
                   className="ml-auto text-xs text-zinc-500 transition-colors hover:text-red-400"
@@ -112,23 +121,25 @@ export function PlanScheduleEditor({
               ) : null}
             </div>
 
-            <div className="flex items-center gap-2 py-1.5">
-              <button
-                onClick={() => insertAt(index + 1, { kind: 'rest' })}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
-              >
-                + Rest day
-              </button>
-              <button
-                onClick={() => insertAt(index + 1, { kind: 'custom', name: 'New day' })}
-                className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
-              >
-                + Working day
-              </button>
-            </div>
+            {started ? (
+              <div className="flex items-center gap-2 py-1.5">
+                <button
+                  onClick={() => insertAt(index + 1, { kind: 'rest' })}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
+                >
+                  + Rest day
+                </button>
+                <button
+                  onClick={() => insertAt(index + 1, { kind: 'custom', name: 'New day' })}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
+                >
+                  + Working day
+                </button>
+              </div>
+            ) : null}
           </div>
         ))}
-        {slots.length === 0 ? (
+        {slots.length === 0 && started ? (
           <button
             onClick={() => insertAt(0, { kind: 'rest' })}
             className="w-full rounded-lg border border-dashed border-zinc-800 py-3 text-sm text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
@@ -138,16 +149,23 @@ export function PlanScheduleEditor({
         ) : null}
       </div>
 
-      {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button onClick={save} disabled={saving || !isDirty}>
-          {saving ? 'Saving…' : 'Save schedule'}
-        </Button>
-        <Button variant="secondary" onClick={reset} disabled={!isDirty}>
-          Reset to default
-        </Button>
-      </div>
+      {started ? (
+        <>
+          {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button onClick={save} disabled={saving || !isDirty}>
+              {saving ? 'Saving…' : 'Save schedule'}
+            </Button>
+            <Button variant="secondary" onClick={reset} disabled={!isDirty}>
+              Reset to default
+            </Button>
+          </div>
+        </>
+      ) : (
+        <p className="mt-4 text-sm text-zinc-500">
+          This is your default cycle — start this plan to customise rest days and extra working days.
+        </p>
+      )}
     </Card>
   )
 }
