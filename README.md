@@ -26,6 +26,17 @@ node scripts/generate-icons.mjs
 
 The service worker only registers in **production** builds (`npm run build && npm run start`, or Vercel), not in `npm run dev`.
 
+## Android app (side-loaded APK)
+
+IronTrack ships as a **WebView shell** (Capacitor) that loads the deployed site — so members on Android get a real installable app while you keep updating the web app without republishing.
+
+- `capacitor.config.ts` sets the app ID (`com.irontrack.app`), name, and the **site URL** the shell loads. Set [the `IRONTRACK_URL` GitHub variable] to your live Vercel URL (or edit the `APP_URL` default in `capacitor.config.ts`), then run `npx cap sync android`.
+- **Building is done on GitHub Actions** (no Android Studio needed on your machine): the `.github/workflows/build-apk.yml` compiles the APK and uploads it as a download link.
+- **First use:** push the repo → GitHub → **Actions → Build Android APK → Run workflow**. Download the `irontrack-apks` artifact.
+  - Without signing secrets you get `app-debug.apk` — installable by tickling **Settings → Install unknown apps**. Run it for real members once you switch to signed releases (below).
+- **Signed builds (recommended for real members):** generate a keystore locally (`keytool -genkeypair ...`), base64 it, and add GitHub secrets `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`. The workflow then also produces a signed `app-release.apk`. Keep that keystore forever — a different key can't update your installed app.
+- iPhone users use the PWA instead — iOS doesn't allow side-loading.
+
 ## Tech stack
 
 | Layer     | Choice                                  |
