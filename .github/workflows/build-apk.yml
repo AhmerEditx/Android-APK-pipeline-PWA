@@ -44,8 +44,17 @@ jobs:
         run: ./gradlew assembleDebug
         working-directory: android
 
+      - name: Detect signing secrets
+        id: detect
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Configure release signing (only when secrets set)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: steps.detect.outputs.present == 'true'
         run: |
           mkdir -p "$RUNNER_TEMP/keystore"
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/keystore/release.jks"
@@ -57,7 +66,7 @@ jobs:
           EOF
 
       - name: Build signed release APK (only when secrets set)
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: steps.detect.outputs.present == 'true'
         run: ./gradlew assembleRelease
         working-directory: android
 
