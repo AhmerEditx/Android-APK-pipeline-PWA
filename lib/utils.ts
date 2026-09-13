@@ -31,6 +31,11 @@ export function localDateISO(value: Date = new Date()): string {
   return new Date(value.getTime() - offset * 60000).toISOString().slice(0, 10)
 }
 
+export function weekdayIndex(value: Date | string = new Date()): number {
+  const d = typeof value === 'string' ? new Date(`${value}T00:00:00`) : value
+  return (d.getDay() + 6) % 7
+}
+
 export function daysBetween(fromISO: string, toISO: string): number {
   const from = new Date(`${fromISO}T00:00:00Z`).getTime()
   const to = new Date(`${toISO}T00:00:00Z`).getTime()

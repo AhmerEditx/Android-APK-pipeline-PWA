@@ -3,39 +3,53 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { defaultScheduleForDays, type ScheduleSlotList } from '@/lib/schedule'
+import {
+  defaultScheduleForDays,
+  WEEKDAY_LABELS,
+  type ScheduleSlot,
+  type ScheduleSlotList,
+} from '@/lib/schedule'
 import { Badge, Button, Card } from '@/components/ui'
 
 type PlanDayInfo = { id: string; position: number; name: string }
 
+function slotSelectValue(slot: ScheduleSlot): string {
+  return slot.kind === 'day' ? slot.planDayId : slot.kind === 'custom' ? 'custom' : 'rest'
+}
+
 export function PlanScheduleEditor({
   userPlanId,
   planDays,
+  planDaysCount,
   initialSchedule,
 }: {
   userPlanId: string | null
   planDays: PlanDayInfo[]
+  planDaysCount: number
   initialSchedule: ScheduleSlotList | null | undefined
 }) {
   const router = useRouter()
   const started = userPlanId !== null
-  const [slots, setSlots] = useState<ScheduleSlotList>(
-    initialSchedule && initialSchedule.length > 0
+  const orderedDays = [...planDays].sort((a, b) => a.position - b.position)
+  const [slots, setSlots] = useState<ScheduleSlotList>(() =>
+    initialSchedule && initialSchedule.length === 7
       ? initialSchedule
-      : defaultScheduleForDays(planDays)
+      : defaultScheduleForDays(planDays, planDaysCount)
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const dayName = (planDayId: string) =>
-    planDays.find((d) => d.id === planDayId)?.name ?? 'Unknown day'
+    orderedDays.find((d) => d.id === planDayId)?.name ?? 'Unknown day'
 
-  function insertAt(index: number, slot: ScheduleSlotList[number]) {
-    setSlots((prev) => [...prev.slice(0, index), slot, ...prev.slice(index)])
+  function setSlotAt(index: number, slot: ScheduleSlot) {
+    setSlots((prev) => prev.map((s, i) => (i === index ? slot : s)))
   }
 
-  function removeAt(index: number) {
-    setSlots((prev) => prev.filter((_, i) => i !== index))
+  function onSelect(index: number, value: string) {
+    if (value === 'rest') setSlotAt(index, { kind: 'rest' })
+    else if (value === 'custom') setSlotAt(index, { kind: 'custom', name: 'New day' })
+    else setSlotAt(index, { kind: 'day', planDayId: value })
   }
 
   function renameCustom(index: number, name: string) {
@@ -62,91 +76,73 @@ export function PlanScheduleEditor({
   }
 
   function reset() {
-    setSlots(defaultScheduleForDays(planDays))
+    setSlots(defaultScheduleForDays(planDays, planDaysCount))
   }
 
-  const defaultSlots = defaultScheduleForDays(planDays)
+  const defaultSlots = defaultScheduleForDays(planDays, planDaysCount)
   const isDirty = JSON.stringify(slots) !== JSON.stringify(defaultSlots)
 
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-zinc-100">Schedule</h2>
-        <Badge tone="accent">{slots.length} session slots</Badge>
+        <h2 className="text-lg font-semibold text-zinc-100">Weekly schedule</h2>
+        <Badge tone="accent">{planDaysCount}-day plan</Badge>
       </div>
       <p className="mb-4 text-sm text-zinc-500">
-        Your personal cycle. Days repeat in this order — add rest days or extra working days wherever you like.
+        Your fixed Monday–Sunday cycle. Every plan fits in one week — set each day to a train day, a
+        rest day, or an extra working day.
       </p>
 
-      <div className="space-y-2">
+      <div className="divide-y divide-zinc-800">
         {slots.map((slot, index) => (
-          <div key={index}>
-            <div className="flex items-center gap-2 border-b border-zinc-800 py-2">
-              {slot.kind === 'rest' ? (
-                <>
-                  <Badge tone="accent">Rest</Badge>
-                  <span className="text-sm text-zinc-300">Recovery day</span>
-                </>
-              ) : slot.kind === 'custom' ? (
-                <>
-                  <Badge tone="accent">+</Badge>
-                  {started ? (
-                    <input
-                      value={slot.name}
-                      onChange={(e) => renameCustom(index, e.target.value)}
-                      placeholder="Day name"
-                      className="w-40 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50"
-                    />
-                  ) : (
-                    <span className="text-sm font-medium text-zinc-100">{slot.name}</span>
-                  )}
-                  <Badge tone="muted">Extra</Badge>
-                </>
-              ) : (
-                <>
-                  <Badge tone="accent">
-                    Day {planDays.find((d) => d.id === slot.planDayId)?.position ?? ''}
-                  </Badge>
-                  <span className="text-sm font-medium text-zinc-100">{dayName(slot.planDayId)}</span>
-                </>
-              )}
-
-              {started && slot.kind !== 'day' ? (
-                <button
-                  onClick={() => removeAt(index)}
-                  className="ml-auto text-xs text-zinc-500 transition-colors hover:text-red-400"
-                >
-                  Remove
-                </button>
-              ) : null}
-            </div>
-
+          <div key={WEEKDAY_LABELS[index]} className="flex flex-wrap items-center gap-3 py-2">
+            <span className="w-24 shrink-0 text-sm font-medium text-zinc-300">
+              {WEEKDAY_LABELS[index]}
+            </span>
             {started ? (
-              <div className="flex items-center gap-2 py-1.5">
-                <button
-                  onClick={() => insertAt(index + 1, { kind: 'rest' })}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <select
+                  value={slotSelectValue(slot)}
+                  onChange={(e) => onSelect(index, e.target.value)}
+                  className="w-52 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 focus:outline-none focus:ring-2 focus:ring-lime-400/50"
                 >
-                  + Rest day
-                </button>
-                <button
-                  onClick={() => insertAt(index + 1, { kind: 'custom', name: 'New day' })}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-zinc-200"
-                >
-                  + Working day
-                </button>
+                  {orderedDays.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      Day {d.position} · {d.name}
+                    </option>
+                  ))}
+                  <option value="rest">Rest day</option>
+                  <option value="custom">Extra working day…</option>
+                </select>
+                {slot.kind === 'custom' ? (
+                  <input
+                    value={slot.name}
+                    onChange={(e) => renameCustom(index, e.target.value)}
+                    placeholder="Day name"
+                    className="w-40 rounded-lg border border-zinc-800 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-lime-400/50"
+                  />
+                ) : slot.kind === 'rest' ? (
+                  <Badge tone="muted">Rest</Badge>
+                ) : (
+                  <Badge tone="accent">{dayName(slot.planDayId)}</Badge>
+                )}
               </div>
-            ) : null}
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                {slot.kind === 'rest' ? (
+                  <Badge tone="muted">Rest</Badge>
+                ) : slot.kind === 'custom' ? (
+                  <Badge tone="accent">{slot.name}</Badge>
+                ) : (
+                  <Badge tone="accent">
+                    Day {orderedDays.find((d) => d.id === slot.planDayId)?.position ?? ''} ·{' '}
+                    {dayName(slot.planDayId)}
+                  </Badge>
+                )}
+              </div>
+            )}
           </div>
         ))}
-        {slots.length === 0 && started ? (
-          <button
-            onClick={() => insertAt(0, { kind: 'rest' })}
-            className="w-full rounded-lg border border-dashed border-zinc-800 py-3 text-sm text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
-          >
-            + Rest day
-          </button>
-        ) : null}
       </div>
 
       {started ? (
@@ -163,7 +159,8 @@ export function PlanScheduleEditor({
         </>
       ) : (
         <p className="mt-4 text-sm text-zinc-500">
-          This is your default cycle — start this plan to customise rest days and extra working days.
+          This is your default weekly cycle — start this plan to customise rest days and extra
+          working days.
         </p>
       )}
     </Card>

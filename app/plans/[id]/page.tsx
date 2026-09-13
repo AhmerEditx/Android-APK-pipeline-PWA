@@ -65,6 +65,7 @@ export default async function PlanDetailPage({
         <PlanScheduleEditor
           userPlanId={active?.id ?? null}
           planDays={days.map((d) => ({ id: d.id, position: d.position, name: d.name }))}
+          planDaysCount={row.days_count}
           initialSchedule={active?.schedule ?? null}
         />
 

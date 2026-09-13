@@ -3,7 +3,7 @@ import { AdminUserActions } from '@/components/admin-user-actions'
 import { BroadcastForm } from '@/components/admin-broadcast-form'
 import { createClient, requireAdmin } from '@/lib/supabase/server'
 import { REST, restSchedulePositions, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
-import { daysBetween, formatDate, localDateISO } from '@/lib/utils'
+import { daysBetween, formatDate, localDateISO, weekdayIndex } from '@/lib/utils'
 
 type UserRow = {
   id: string
@@ -76,15 +76,19 @@ export default async function AdminPage() {
     const p = planMap.get(userId)
     if (!p?.plans) return null
     const daysElapsed = Math.max(daysBetween(p.starts_on, today), 0)
+    const weekIndex = weekdayIndex(today)
     const saved = p.schedule
     if (saved && saved.length > 0) {
-      const slot = saved[daysElapsed % saved.length] as ScheduleSlot
+      const slot =
+        saved.length === 7
+          ? saved[weekIndex]
+          : (saved[daysElapsed % saved.length] as ScheduleSlot)
       if (slot.kind === REST) return `${p.plans.name} · Rest day`
       if (slot.kind === 'custom') return `${p.plans.name} · ${slot.name}`
       return `${p.plans.name} · Training day`
     }
     const positions = restSchedulePositions(p.plans.days_count)
-    const slot = positions[daysElapsed % positions.length]
+    const slot = positions[weekIndex]
     if (slot === REST) return `${p.plans.name} · Rest day`
     return `${p.plans.name} · Day ${slot} of ${p.plans.days_count}`
   }

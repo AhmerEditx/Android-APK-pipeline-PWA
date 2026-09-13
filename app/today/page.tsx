@@ -4,7 +4,7 @@ import { TodayChecklist } from '@/components/today-checklist'
 import type { TodaysExercises } from '@/components/today-checklist'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import { REST, defaultScheduleForDays, nextTrainingSlot, type ScheduleSlotList } from '@/lib/schedule'
-import { addDays, daysBetween, localDateISO } from '@/lib/utils'
+import { addDays, daysBetween, localDateISO, weekdayIndex } from '@/lib/utils'
 
 type ActivePlanRow = {
   id: string
@@ -100,7 +100,7 @@ export default async function TodayPage() {
 
   const saved = row.schedule
   const schedule: ScheduleSlotList =
-    saved && saved.length > 0 ? saved : defaultScheduleForDays(planDayRows)
+    saved && saved.length > 0 ? saved : defaultScheduleForDays(planDayRows, row.plans.days_count)
 
   if (schedule.length === 0) {
     return (
@@ -114,7 +114,8 @@ export default async function TodayPage() {
     )
   }
 
-  const slotIndex = daysElapsed % schedule.length
+  const slotIndex =
+    schedule.length === 7 ? weekdayIndex(today) : daysElapsed % schedule.length
   const slot = schedule[slotIndex]
 
   if (slot.kind === REST) {
