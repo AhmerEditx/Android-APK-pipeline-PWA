@@ -1,10 +1,5 @@
 import { PageHeader } from '@/components/ui'
-import {
-  ExerciseTrendChart,
-  VolumeChart,
-  WeightChart,
-  WeightLogForm,
-} from '@/components/progress-charts'
+import { ProgressChartsLazy } from './progress-charts-lazy'
 import { createClient, requireUser } from '@/lib/supabase/server'
 
 type TrendRow = {
@@ -86,15 +81,11 @@ export default async function ProgressPage() {
         description="Track your body weight, volume, and strength over time."
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <WeightLogForm />
-        <WeightChart measurements={measurementPoints} />
-      </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <VolumeChart volumeByDate={volumeByDate} />
-        <ExerciseTrendChart trends={trends} />
-      </div>
+      <ProgressChartsLazy
+        measurementPoints={measurementPoints}
+        volumeByDate={volumeByDate}
+        trends={trends}
+      />
     </div>
   )
 }

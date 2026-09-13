@@ -3,6 +3,12 @@
 :root {
   --background: #09090b;
   --foreground: #fafafa;
+  color-scheme: dark;
+}
+
+html,
+body {
+  overscroll-behavior-y: none;
 }
 
 @theme inline {
@@ -20,6 +26,18 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+}
+
+/* Prevent iOS auto-zoom when focusing small inputs. */
+@media (max-width: 1023px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 ::selection {

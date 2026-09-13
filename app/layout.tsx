@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Nav } from '@/components/nav'
+import { AppBridge } from '@/components/app-bridge'
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
 
 const geistSans = Geist({
@@ -36,6 +37,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: '#09090b',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
@@ -43,8 +49,9 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-zinc-950 text-zinc-100" suppressHydrationWarning>
         <ServiceWorkerRegistration />
+        <AppBridge />
         <Nav />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 pb-24 sm:px-6 lg:pb-8">{children}</main>
       </body>
     </html>
   )
