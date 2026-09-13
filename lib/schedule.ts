@@ -11,9 +11,8 @@ export function restSchedulePositions(daysCount: number): Array<number | typeof 
   const slots: Array<number | typeof REST> = []
   for (let day = 1; day <= daysCount; day++) {
     slots.push(day)
-    if (day === 3 && daysCount > 3) slots.push(REST)
+    slots.push(REST)
   }
-  if (daysCount > 0) slots.push(REST)
   return slots
 }
 
@@ -22,11 +21,10 @@ export function defaultScheduleForDays(
 ): ScheduleSlotList {
   const sorted = [...planDays].sort((a, b) => a.position - b.position)
   const slots: ScheduleSlotList = []
-  for (let i = 0; i < sorted.length; i++) {
-    slots.push({ kind: 'day', planDayId: sorted[i].id })
-    if (i === 2 && sorted.length > 3) slots.push({ kind: REST })
+  for (const planDay of sorted) {
+    slots.push({ kind: 'day', planDayId: planDay.id })
+    slots.push({ kind: REST })
   }
-  if (sorted.length > 0) slots.push({ kind: REST })
   return slots
 }
 
