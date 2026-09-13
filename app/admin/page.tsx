@@ -2,6 +2,7 @@ import { Badge, Card, PageHeader } from '@/components/ui'
 import { AdminUserActions } from '@/components/admin-user-actions'
 import { BroadcastForm } from '@/components/admin-broadcast-form'
 import { createClient, requireAdmin } from '@/lib/supabase/server'
+import { REST, restSchedule } from '@/lib/schedule'
 import { daysBetween, formatDate, localDateISO } from '@/lib/utils'
 
 type UserRow = {
@@ -74,8 +75,10 @@ export default async function AdminPage() {
     const p = planMap.get(userId)
     if (!p?.plans) return null
     const daysElapsed = Math.max(daysBetween(p.starts_on, today), 0)
-    const day = (daysElapsed % p.plans.days_count) + 1
-    return `${p.plans.name} · Day ${day} of ${p.plans.days_count}`
+    const schedule = restSchedule(p.plans.days_count)
+    const slot = schedule[daysElapsed % schedule.length]
+    if (slot === REST) return `${p.plans.name} · Rest day`
+    return `${p.plans.name} · Day ${slot} of ${p.plans.days_count}`
   }
 
   return (

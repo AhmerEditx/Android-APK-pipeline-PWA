@@ -3,6 +3,7 @@ import { Badge, EmptyState, PageHeader } from '@/components/ui'
 import { TodayChecklist } from '@/components/today-checklist'
 import type { TodaysExercises } from '@/components/today-checklist'
 import { createClient, requireUser } from '@/lib/supabase/server'
+import { REST, restSchedule } from '@/lib/schedule'
 import { addDays, daysBetween, localDateISO } from '@/lib/utils'
 
 type ActivePlanRow = {
@@ -76,7 +77,50 @@ export default async function TodayPage() {
   const row = active as unknown as ActivePlanRow
   const today = localDateISO()
   const daysElapsed = Math.max(daysBetween(row.starts_on, today), 0)
-  const position = (daysElapsed % row.plans.days_count) + 1
+  const schedule = restSchedule(row.plans.days_count)
+  const slotIndex = daysElapsed % schedule.length
+  const slot = schedule[slotIndex]
+
+  if (slot === REST) {
+    const nextPosition = schedule[(slotIndex + 1) % schedule.length] as number
+    const { data: nextDay } = await supabase
+      .from('plan_days')
+      .select('name, position')
+      .eq('plan_id', row.plans.id)
+      .eq('position', nextPosition)
+      .maybeSingle()
+    const nextName = (nextDay as unknown as { name: string } | null)?.name
+
+    return (
+      <div>
+        <PageHeader
+          title="Rest day"
+          description={`${row.plans.name} · recover before the next session.`}
+        />
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 sm:p-8">
+          <div className="flex items-center gap-2">
+            <Badge tone="accent">Rest</Badge>
+            <Badge>{nextName ? `Next: Day ${nextPosition} · ${nextName}` : 'Rest day'}</Badge>
+          </div>
+          <h2 className="mt-4 text-xl font-bold text-zinc-50">Rest &amp; recover today.</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {nextName
+              ? `Your next session is Day ${nextPosition} of ${row.plans.days_count} · ${nextName}.`
+              : `Day ${nextPosition} of ${row.plans.days_count} is next.`}{' '}
+            Your next workout will appear here automatically.
+          </p>
+          <Link
+            href="/workouts/new"
+            className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300"
+          >
+            Log a workout anyway
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const position = slot
 
   const [{ data: planDay }, { data: lastAttempts }] = await Promise.all([
     supabase
