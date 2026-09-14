@@ -105,6 +105,7 @@ export default async function PlanDetailPage({
         />
 
         <PlanExercisesEditor
+          planId={row.id}
           userPlanId={active?.id ?? null}
           days={days.map((d) => ({ id: d.id, position: d.position, name: d.name }))}
           currentByDay={currentByDay}

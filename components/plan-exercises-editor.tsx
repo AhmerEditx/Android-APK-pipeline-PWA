@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { EffectiveExercise } from '@/lib/plan-exercises'
+import { setPendingPlanExercises, clearPendingPlanExercises } from '@/lib/plan-edit-store'
 import { Badge, Button, Card, Input } from '@/components/ui'
 import { TrashIcon } from './icons'
 
@@ -26,13 +27,25 @@ function deepCopy(
   return copy
 }
 
+function exercisesEqual(a: EffectiveExercise[], b: EffectiveExercise[]) {
+  if (a.length !== b.length) return false
+  return a.every(
+    (e, i) =>
+      e.exerciseId === b[i].exerciseId &&
+      e.prescribedSets === b[i].prescribedSets &&
+      e.prescribedReps === b[i].prescribedReps
+  )
+}
+
 export function PlanExercisesEditor({
+  planId,
   userPlanId,
   days,
   currentByDay,
   templateByDay,
   catalog,
 }: {
+  planId: string
   userPlanId: string | null
   days: EditorDay[]
   currentByDay: Record<string, EffectiveExercise[]>
@@ -71,8 +84,24 @@ export function PlanExercisesEditor({
   }, [catalog, addedIds, muscleFilter, query])
 
   const dirty = orderedDays.some(
-    (day) => JSON.stringify(byDay[day.id] ?? []) !== JSON.stringify(templateByDay[day.id] ?? [])
+    (day) =>
+      !exercisesEqual(
+        byDay[day.id] ?? [],
+        templateByDay[day.id] ?? []
+      )
   )
+
+  useEffect(() => {
+    if (started) return
+    const isDirty = orderedDays.some(
+      (day) => !exercisesEqual(byDay[day.id] ?? [], templateByDay[day.id] ?? [])
+    )
+    if (isDirty) {
+      setPendingPlanExercises(planId, byDay)
+    } else {
+      clearPendingPlanExercises(planId)
+    }
+  }, [byDay, planId, started, templateByDay, orderedDays])
 
   function updateExercise(dayId: string, index: number, patch: Partial<EffectiveExercise>) {
     setByDay((prev) => {
@@ -117,6 +146,7 @@ export function PlanExercisesEditor({
     setByDay(deepCopy(orderedDays, templateByDay))
     setPickerDay(null)
     setError(null)
+    if (!started) clearPendingPlanExercises(planId)
   }
 
   async function save() {
@@ -155,6 +185,7 @@ export function PlanExercisesEditor({
         )
         if (insErr) throw new Error(insErr.message)
       }
+      clearPendingPlanExercises(planId)
       router.refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save exercises.')
@@ -164,6 +195,12 @@ export function PlanExercisesEditor({
 
   return (
     <div className="space-y-6">
+      {!started && (
+        <p className="rounded-lg border border-lime-400/20 bg-lime-400/5 px-4 py-3 text-sm text-lime-300">
+          Customise the exercises below — your changes will be used when you start this plan.
+        </p>
+      )}
+
       {orderedDays.map((day) => {
         const list = byDay[day.id] ?? []
         const pickerOpen = pickerDay === day.id
@@ -190,134 +227,121 @@ export function PlanExercisesEditor({
                       <span className="font-medium text-zinc-100">{exercise.name}</span>
                       <Badge tone="muted">{exercise.muscleGroup}</Badge>
                     </div>
-                    {started ? (
-                      <div className="flex items-center gap-2">
-                        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                          Sets
-                          <Input
-                            type="number"
-                            min={1}
-                            inputMode="numeric"
-                            value={exercise.prescribedSets}
-                            onChange={(e) =>
-                              updateExercise(day.id, index, {
-                                prescribedSets: Math.max(1, Number(e.target.value) || 1),
-                              })
-                            }
-                            className="w-16 px-2 py-1 text-sm"
-                          />
-                        </label>
-                        <label className="flex items-center gap-1.5 text-xs text-zinc-500">
-                          Reps
-                          <Input
-                            type="text"
-                            inputMode="text"
-                            placeholder="10-12"
-                            value={exercise.prescribedReps ?? ''}
-                            onChange={(e) =>
-                              updateExercise(day.id, index, {
-                                prescribedReps: e.target.value,
-                              })
-                            }
-                            className="w-20 px-2 py-1 text-sm"
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => removeExercise(day.id, index)}
-                          aria-label={`Remove ${exercise.name}`}
-                          className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
-                        >
-                          <TrashIcon className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-zinc-400">
-                        <Badge>{exercise.prescribedSets} sets</Badge>
-                        <span>
-                          {exercise.prescribedReps
-                            ? `${exercise.prescribedReps} reps`
-                            : '\u00A0'}
-                        </span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                        Sets
+                        <Input
+                          type="number"
+                          min={1}
+                          inputMode="numeric"
+                          value={exercise.prescribedSets}
+                          onChange={(e) =>
+                            updateExercise(day.id, index, {
+                              prescribedSets: Math.max(1, Number(e.target.value) || 1),
+                            })
+                          }
+                          className="w-16 px-2 py-1 text-sm"
+                        />
+                      </label>
+                      <label className="flex items-center gap-1.5 text-xs text-zinc-500">
+                        Reps
+                        <Input
+                          type="text"
+                          inputMode="text"
+                          placeholder="10-12"
+                          value={exercise.prescribedReps ?? ''}
+                          onChange={(e) =>
+                            updateExercise(day.id, index, {
+                              prescribedReps: e.target.value,
+                            })
+                          }
+                          className="w-20 px-2 py-1 text-sm"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => removeExercise(day.id, index)}
+                        aria-label={`Remove ${exercise.name}`}
+                        className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
 
-            {started ? (
-              <div className="mt-4">
-                {pickerOpen ? (
-                  <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-zinc-300">Add an exercise</span>
+            <div className="mt-4">
+              {pickerOpen ? (
+                <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-zinc-300">Add an exercise</span>
+                    <button
+                      type="button"
+                      onClick={() => setPickerDay(null)}
+                      className="text-sm text-zinc-500 hover:text-zinc-200"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <Input
+                    type="search"
+                    placeholder="Search the exercise library…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMuscleFilter(null)}
+                      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                        muscleFilter === null
+                          ? 'border-lime-400 bg-lime-400/10 text-lime-300'
+                          : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {muscleGroups.map((group) => (
                       <button
+                        key={group}
                         type="button"
-                        onClick={() => setPickerDay(null)}
-                        className="text-sm text-zinc-500 hover:text-zinc-200"
-                      >
-                        Close
-                      </button>
-                    </div>
-                    <Input
-                      type="search"
-                      placeholder="Search the exercise library…"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                    />
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setMuscleFilter(null)}
+                        onClick={() => setMuscleFilter(muscleFilter === group ? null : group)}
                         className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                          muscleFilter === null
+                          muscleFilter === group
                             ? 'border-lime-400 bg-lime-400/10 text-lime-300'
                             : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
                         }`}
                       >
-                        All
+                        {group}
                       </button>
-                      {muscleGroups.map((group) => (
+                    ))}
+                  </div>
+                  {results.length > 0 ? (
+                    <div className="mt-4 overflow-hidden rounded-lg border border-zinc-800">
+                      {results.map((exercise) => (
                         <button
-                          key={group}
+                          key={exercise.id}
                           type="button"
-                          onClick={() => setMuscleFilter(muscleFilter === group ? null : group)}
-                          className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                            muscleFilter === group
-                              ? 'border-lime-400 bg-lime-400/10 text-lime-300'
-                              : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
-                          }`}
+                          onClick={() => addExercise(day.id, exercise)}
+                          className="flex w-full items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900/60 px-4 py-3 text-left text-sm transition-colors last:border-b-0 hover:bg-zinc-800"
                         >
-                          {group}
+                          <span className="font-medium text-zinc-100">{exercise.name}</span>
+                          <Badge tone="muted">{exercise.muscle_group}</Badge>
                         </button>
                       ))}
                     </div>
-                    {results.length > 0 ? (
-                      <div className="mt-4 overflow-hidden rounded-lg border border-zinc-800">
-                        {results.map((exercise) => (
-                          <button
-                            key={exercise.id}
-                            type="button"
-                            onClick={() => addExercise(day.id, exercise)}
-                            className="flex w-full items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900/60 px-4 py-3 text-left text-sm transition-colors last:border-b-0 hover:bg-zinc-800"
-                          >
-                            <span className="font-medium text-zinc-100">{exercise.name}</span>
-                            <Badge tone="muted">{exercise.muscle_group}</Badge>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-4 text-sm text-zinc-500">No matching exercises.</p>
-                    )}
-                  </div>
-                ) : (
-                  <Button type="button" variant="secondary" size="sm" onClick={() => setPickerDay(day.id)}>
-                    + Add exercise
-                  </Button>
-                )}
-              </div>
-            ) : null}
+                  ) : (
+                    <p className="mt-4 text-sm text-zinc-500">No matching exercises.</p>
+                  )}
+                </div>
+              ) : (
+                <Button type="button" variant="secondary" size="sm" onClick={() => setPickerDay(day.id)}>
+                  + Add exercise
+                </Button>
+              )}
+            </div>
           </Card>
         )
       })}
@@ -330,8 +354,7 @@ export function PlanExercisesEditor({
             </p>
           ) : null}
           <p className="mb-3 text-sm text-zinc-500">
-            Changes apply to your copy of the plan and show up on Today. Exercise picks come from the
-            shared library, so anyone can use them.
+            Changes apply to your copy of the plan and show up on Today.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button onClick={save} disabled={saving || !dirty}>
@@ -343,9 +366,11 @@ export function PlanExercisesEditor({
           </div>
         </div>
       ) : (
-        <p className="text-sm text-zinc-500">
-          These are the plan&apos;s preset exercises — start this plan to add, remove, or adjust them.
-        </p>
+        <div>
+          <Button variant="secondary" onClick={resetToTemplate} disabled={!dirty}>
+            Restore template
+          </Button>
+        </div>
       )}
     </div>
   )

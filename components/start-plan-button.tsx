@@ -3,6 +3,11 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import {
+  clearPendingPlanExercises,
+  getPendingPlanExercises,
+} from '@/lib/plan-edit-store'
+import type { EffectiveExercise } from '@/lib/plan-exercises'
 import { Button } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
 
@@ -41,38 +46,70 @@ export function StartPlanButton({ planId, startsOn }: { planId: string; startsOn
       if (insertErr) throw new Error(insertErr.message)
 
       try {
-        const { data: days } = (await supabase
-          .from('plan_days')
-          .select(
-            'id, plan_day_exercises(exercise_id, position, prescribed_sets, prescribed_reps, target_weight)'
+        const pending = getPendingPlanExercises(planId)
+        if (pending) {
+          const rows: Array<{
+            user_id: string
+            user_plan_id: string
+            plan_day_id: string
+            exercise_id: string
+            position: number
+            prescribed_sets: number
+            prescribed_reps: string | null
+            target_weight: string | null
+          }> = []
+          for (const [dayId, exercises] of Object.entries(pending)) {
+            exercises.forEach((ex: EffectiveExercise, index: number) => {
+              rows.push({
+                user_id: user.id,
+                user_plan_id: created.id,
+                plan_day_id: dayId,
+                exercise_id: ex.exerciseId,
+                position: index + 1,
+                prescribed_sets: ex.prescribedSets,
+                prescribed_reps: ex.prescribedReps || null,
+                target_weight: ex.targetWeight || null,
+              })
+            })
+          }
+          if (rows.length > 0) {
+            await supabase.from('user_plan_exercises').insert(rows)
+          }
+        } else {
+          const { data: days } = (await supabase
+            .from('plan_days')
+            .select(
+              'id, plan_day_exercises(exercise_id, position, prescribed_sets, prescribed_reps, target_weight)'
+            )
+            .eq('plan_id', planId)) as {
+            data: Array<{
+              id: string
+              plan_day_exercises: Array<{
+                exercise_id: string
+                position: number
+                prescribed_sets: number
+                prescribed_reps: string | null
+                target_weight: string | null
+              }>
+            }> | null
+          }
+          const rows = (days ?? []).flatMap((day) =>
+            day.plan_day_exercises.map((pde) => ({
+              user_id: user.id,
+              user_plan_id: created.id,
+              plan_day_id: day.id,
+              exercise_id: pde.exercise_id,
+              position: pde.position,
+              prescribed_sets: pde.prescribed_sets,
+              prescribed_reps: pde.prescribed_reps,
+              target_weight: pde.target_weight,
+            }))
           )
-          .eq('plan_id', planId)) as {
-          data: Array<{
-            id: string
-            plan_day_exercises: Array<{
-              exercise_id: string
-              position: number
-              prescribed_sets: number
-              prescribed_reps: string | null
-              target_weight: string | null
-            }>
-          }> | null
+          if (rows.length > 0) {
+            await supabase.from('user_plan_exercises').insert(rows)
+          }
         }
-        const rows = (days ?? []).flatMap((day) =>
-          day.plan_day_exercises.map((pde) => ({
-            user_id: user.id,
-            user_plan_id: created.id,
-            plan_day_id: day.id,
-            exercise_id: pde.exercise_id,
-            position: pde.position,
-            prescribed_sets: pde.prescribed_sets,
-            prescribed_reps: pde.prescribed_reps,
-            target_weight: pde.target_weight,
-          }))
-        )
-        if (rows.length > 0) {
-          await supabase.from('user_plan_exercises').insert(rows)
-        }
+        clearPendingPlanExercises(planId)
       } catch {
         // Non-fatal: they can still customise later, which materialises the copy.
       }
