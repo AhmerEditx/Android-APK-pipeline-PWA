@@ -88,6 +88,18 @@ export type UserPlan = {
   created_at: string
 }
 
+export type UserPlanExercise = {
+  id: string
+  user_id: string
+  user_plan_id: string
+  plan_day_id: string
+  exercise_id: string
+  position: number
+  prescribed_sets: number
+  prescribed_reps: string | null
+  target_weight: string | null
+}
+
 export type Message = {
   id: string
   recipient_id: string
@@ -226,6 +238,22 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<UserPlan>
+        Relationships: []
+      }
+      user_plan_exercises: {
+        Row: UserPlanExercise
+        Insert: {
+          id?: string
+          user_id?: string
+          user_plan_id: string
+          plan_day_id: string
+          exercise_id: string
+          position?: number
+          prescribed_sets?: number
+          prescribed_reps?: string | null
+          target_weight?: string | null
+        }
+        Update: Partial<UserPlanExercise>
         Relationships: []
       }
       messages: {

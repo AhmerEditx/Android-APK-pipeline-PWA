@@ -2,6 +2,11 @@ import Link from 'next/link'
 import { Badge, EmptyState, PageHeader } from '@/components/ui'
 import { TodayChecklist } from '@/components/today-checklist'
 import type { TodaysExercises } from '@/components/today-checklist'
+import {
+  effectiveExercisesForDay,
+  type TemplatePlanDay,
+  type UserPlanExerciseRow,
+} from '@/lib/plan-exercises'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import { REST, defaultScheduleForDays, nextTrainingSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { addDays, daysBetween, localDateISO, weekdayIndex } from '@/lib/utils'
@@ -79,12 +84,18 @@ export default async function TodayPage() {
   const today = localDateISO()
   const daysElapsed = Math.max(daysBetween(row.starts_on, today), 0)
 
-  const [{ data: planDaysData }, { data: lastAttempts }] = await Promise.all([
+  const [{ data: planDaysData }, { data: userExData }, { data: lastAttempts }] = await Promise.all([
     supabase
       .from('plan_days')
       .select('id, name, position, plan_day_exercises(*, exercises(id, name, muscle_group))')
       .eq('plan_id', row.plans.id)
       .order('position', { ascending: true }),
+    supabase
+      .from('user_plan_exercises')
+      .select(
+        'id, plan_day_id, exercise_id, position, prescribed_sets, prescribed_reps, target_weight, exercises(id, name, muscle_group)'
+      )
+      .eq('user_plan_id', row.id),
     supabase
       .from('workouts')
       .select('date, workout_exercises(exercise_id, sets(weight_kg, reps, is_warmup))')
@@ -97,6 +108,8 @@ export default async function TodayPage() {
 
   const planDayRows = (planDaysData ?? []) as unknown as PlanDayRow[]
   const dayById = new Map(planDayRows.map((d) => [d.id, d]))
+  const userRows = (userExData ?? []) as unknown as UserPlanExerciseRow[]
+  const customized = userRows.length > 0
 
   const saved = row.schedule
   const schedule: ScheduleSlotList =
@@ -191,7 +204,11 @@ export default async function TodayPage() {
     )
   }
 
-  const exercises = [...day.plan_day_exercises].sort((a, b) => a.position - b.position)
+  const exercises = effectiveExercisesForDay(
+    day as unknown as TemplatePlanDay,
+    userRows,
+    customized
+  )
 
   const attempts = (lastAttempts ?? []) as unknown as LastAttemptRow[]
   const lastByExercise = new Map<
@@ -206,16 +223,16 @@ export default async function TodayPage() {
     }
   }
 
-  const todaysExercises: TodaysExercises = exercises.map((pde) => {
-    const last = pde.exercises ? lastByExercise.get(pde.exercises.id) : undefined
+  const todaysExercises: TodaysExercises = exercises.map((ex) => {
+    const last = ex.exerciseId ? lastByExercise.get(ex.exerciseId) : undefined
     return {
-      pdeId: pde.id,
-      exerciseId: pde.exercises?.id ?? '',
-      name: pde.exercises?.name ?? 'Unknown exercise',
-      muscleGroup: pde.exercises?.muscle_group ?? '',
-      prescribedSets: pde.prescribed_sets,
-      prescribedReps: pde.prescribed_reps,
-      targetWeight: pde.target_weight,
+      pdeId: ex.refId,
+      exerciseId: ex.exerciseId,
+      name: ex.name,
+      muscleGroup: ex.muscleGroup,
+      prescribedSets: ex.prescribedSets,
+      prescribedReps: ex.prescribedReps,
+      targetWeight: ex.targetWeight,
       last: last
         ? { date: last.date, sets: last.sets.filter((set) => !set.is_warmup) }
         : null,

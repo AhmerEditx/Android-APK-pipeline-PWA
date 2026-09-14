@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useEffect, useState, type ComponentType } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { App } from '@capacitor/app'
 import { createClient } from '@/lib/supabase/client'
 import { LogoutButton } from './logout-button'
 import {
   AdminIcon,
+  BackIcon,
   ChartIcon,
   CloseIcon,
   HistoryIcon,
@@ -38,17 +41,58 @@ const tabBarLinks = [
 
 export function Nav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [authed, setAuthed] = useState(false)
   const [ready, setReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [unread, setUnread] = useState(0)
   const [moreOpen, setMoreOpen] = useState(false)
   const [prevPathname, setPrevPathname] = useState(pathname)
+  const [canBack, setCanBack] = useState(false)
+  const stackRef = useRef<string[]>([])
 
   if (prevPathname !== pathname) {
     setPrevPathname(pathname)
     setMoreOpen(false)
   }
+
+  useEffect(() => {
+    const stack = stackRef.current
+    if (stack[stack.length - 1] !== pathname) {
+      if (stack.length > 30) stack.shift()
+      stack.push(pathname)
+    }
+    setCanBack(stack.length > 1)
+  }, [pathname])
+
+  const goBack = () => {
+    const stack = stackRef.current
+    if (stack.length < 2) return
+    stack.pop()
+    setCanBack(stack.length > 1)
+    const target = stack[stack.length - 1]
+    if (target) router.push(target)
+  }
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const listenerPromise = App.addListener('backButton', ({ canGoBack }) => {
+      const stack = stackRef.current
+      if (stack.length > 1) {
+        stack.pop()
+        setCanBack(stack.length > 1)
+        const target = stack[stack.length - 1]
+        if (target) router.push(target)
+      } else if (canGoBack) {
+        history.back()
+      } else {
+        App.exitApp()
+      }
+    })
+    return () => {
+      listenerPromise.then((listener) => listener.remove())
+    }
+  }, [router])
 
   useEffect(() => {
     const supabase = createClient()
@@ -58,7 +102,11 @@ export function Nav() {
       const user = data.user
       setAuthed(Boolean(user))
       setReady(true)
-      if (!user) return
+      if (!user) {
+        stackRef.current = []
+        setCanBack(false)
+        return
+      }
 
       const [{ data: profile }, { count }] = await Promise.all([
         supabase
@@ -114,12 +162,24 @@ export function Nav() {
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-zinc-50">
-            <span className="flex h-6 w-6 items-center justify-center rounded bg-lime-400 text-sm font-black text-zinc-950">
-              I
-            </span>
-            IronTrack
-          </Link>
+          <div className="flex min-w-0 items-center gap-1">
+            {showNav && canBack ? (
+              <button
+                type="button"
+                onClick={goBack}
+                aria-label="Go back"
+                className="-ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-900 hover:text-zinc-100 lg:hidden"
+              >
+                <BackIcon className="h-5 w-5" />
+              </button>
+            ) : null}
+            <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-zinc-50">
+              <span className="flex h-6 w-6 items-center justify-center rounded bg-lime-400 text-sm font-black text-zinc-950">
+                I
+              </span>
+              <span className="truncate">IronTrack</span>
+            </Link>
+          </div>
 
           {showNav ? (
             <nav className="hidden items-center gap-1 lg:flex">
