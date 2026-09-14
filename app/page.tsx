@@ -32,14 +32,15 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const user = await requireUser()
 
-  const [{ data: profile }, { data: workoutRows }, { data: recent }, { data: measurements }] =
+  const [{ data: profile }, { count: totalWorkouts }, { data: workoutRows }, { data: recent }, { data: measurements }] =
     await Promise.all([
       supabase
         .from('profiles')
         .select('full_name, height_cm')
         .eq('id', user.id)
         .maybeSingle(),
-      supabase.from('workouts').select('id, date, workout_exercises(sets(weight_kg, reps))'),
+      supabase.from('workouts').select('id', { count: 'exact', head: true }),
+      supabase.from('workouts').select('id, date, workout_exercises(sets(weight_kg, reps))').order('date', { ascending: false }).limit(1000),
       supabase
         .from('workouts')
         .select('id, date, notes, workout_exercises(exercises(name))')
@@ -52,7 +53,6 @@ export default async function DashboardPage() {
     ])
 
   const rows = (workoutRows ?? []) as unknown as WorkoutVolumeRow[]
-  const totalWorkouts = rows.length
   const weekStart = startOfWeek()
   const workoutsThisWeek = rows.filter((w) => w.date >= weekStart).length
   const totalVolume = rows.reduce(

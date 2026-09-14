@@ -15,6 +15,7 @@ import {
   MoreIcon,
   PlansIcon,
   PlusIcon,
+  ProfileIcon,
   TodayIcon,
 } from './icons'
 
@@ -25,6 +26,7 @@ const desktopLinks = [
   { href: '/workouts/new', label: 'Log Workout' },
   { href: '/history', label: 'History' },
   { href: '/progress', label: 'Progress' },
+  { href: '/profile', label: 'Profile' },
 ]
 
 const tabBarLinks = [
@@ -99,6 +101,7 @@ export function Nav() {
     { href: '/plans', label: 'Plans', icon: PlansIcon },
     { href: '/history', label: 'History', icon: HistoryIcon },
     { href: '/messages', label: 'Messages', icon: MessagesIcon, badge: unread },
+    { href: '/profile', label: 'Profile', icon: ProfileIcon },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: AdminIcon }] : []),
   ]
 

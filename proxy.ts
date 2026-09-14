@@ -56,6 +56,7 @@ export const config = {
     '/plans/:path*',
     '/admin',
     '/messages',
+    '/profile',
     '/exercises/:path*',
     '/workouts/:path*',
     '/history/:path*',
