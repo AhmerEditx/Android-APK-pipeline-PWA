@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { Badge, EmptyState, PageHeader } from '@/components/ui'
 import { TodayChecklist } from '@/components/today-checklist'
 import type { TodaysExercises } from '@/components/today-checklist'
+import { TodayExerciseEditor } from '@/components/today-exercise-editor'
+import type { CatalogExercise } from '@/components/plan-exercises-editor'
 import {
   effectiveExercisesForDay,
   type TemplatePlanDay,
@@ -84,7 +86,12 @@ export default async function TodayPage() {
   const today = localDateISO()
   const daysElapsed = Math.max(daysBetween(row.starts_on, today), 0)
 
-  const [{ data: planDaysData }, { data: userExData }, { data: lastAttempts }] = await Promise.all([
+  const [
+    { data: planDaysData },
+    { data: userExData },
+    { data: lastAttempts },
+    { data: catalogData },
+  ] = await Promise.all([
     supabase
       .from('plan_days')
       .select('id, name, position, plan_day_exercises(*, exercises(id, name, muscle_group))')
@@ -104,12 +111,21 @@ export default async function TodayPage() {
       .gte('date', addDays(today, -13))
       .order('date', { ascending: false })
       .limit(30),
+    supabase.from('exercises').select('id, name, muscle_group, equipment, primary_muscle').order('name'),
   ])
 
   const planDayRows = (planDaysData ?? []) as unknown as PlanDayRow[]
   const dayById = new Map(planDayRows.map((d) => [d.id, d]))
   const userRows = (userExData ?? []) as unknown as UserPlanExerciseRow[]
   const customized = userRows.length > 0
+  const templateByDay: Record<string, ReturnType<typeof effectiveExercisesForDay>> = {}
+  for (const planDay of planDayRows) {
+    templateByDay[planDay.id] = effectiveExercisesForDay(
+      planDay as unknown as TemplatePlanDay,
+      [],
+      false
+    )
+  }
 
   const saved = row.schedule
   const schedule: ScheduleSlotList =
@@ -252,6 +268,14 @@ export default async function TodayPage() {
             <Badge>{setsToday} sets</Badge>
           </div>
         }
+      />
+      <TodayExerciseEditor
+        userPlanId={row.id}
+        planDayId={day.id}
+        dayName={day.name}
+        currentExercises={exercises}
+        templateByDay={templateByDay}
+        catalog={(catalogData ?? []) as unknown as CatalogExercise[]}
       />
       <TodayChecklist
         planDayId={day.id}
