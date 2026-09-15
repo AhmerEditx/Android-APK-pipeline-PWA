@@ -1,17 +1,22 @@
 import Link from 'next/link'
 import { createClient, requireUser } from '@/lib/supabase/server'
-import { formatDate, formatNumber, computeWorkoutStreaks, startOfWeek } from '@/lib/utils'
+import { formatDate, computeWorkoutStreaks, startOfWeek, localDateISO, daysBetween, weekdayIndex } from '@/lib/utils'
+import { REST, defaultScheduleForDays, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui'
 import { DeleteWorkoutButton } from '@/components/delete-workout-button'
-import { AchievementsCompact } from '@/components/achievements-grid'
-import { getAchievements } from '@/lib/achievements'
 
-type WorkoutVolumeRow = {
+type UserPlanRow = {
+  id: string
+  active: boolean
+  starts_on: string
+  schedule: ScheduleSlotList | null
+  plans: { id: string; name: string; days_count: number } | null
+}
+
+type TodayWorkoutRow = {
   id: string
   date: string
-  workout_exercises: Array<{
-    sets: Array<{ weight_kg: number | null; reps: number | null }>
-  }>
+  workout_exercises: Array<{ exercises: { name: string } | null }>
 }
 
 type RecentRow = {
@@ -21,213 +26,346 @@ type RecentRow = {
   workout_exercises: Array<{ exercises: { name: string } | null }>
 }
 
-async function fetchTotalVolume(
-  supabase: Awaited<ReturnType<typeof createClient>>
-): Promise<{ volume: number }> {
-  const rpc = (name: string) =>
-    supabase.rpc(name) as unknown as Promise<{
-      data: number | null
-      error: { code?: string; message?: string } | null
-    }>
-  const { data, error } = await rpc('get_total_volume')
-  if (error?.code !== 'PGRST202') {
-    if (error) throw new Error(error.message ?? 'Could not compute volume.')
-    return { volume: data ?? 0 }
-  }
-  const { data: rows } = await supabase
-    .from('workouts')
-    .select('id, date, workout_exercises(sets(weight_kg, reps))')
-    .order('date', { ascending: false })
-    .limit(1000)
-  const volumeRows = (rows ?? []) as unknown as WorkoutVolumeRow[]
-  const volume = volumeRows.reduce(
-    (sum, w) =>
-      sum +
-      w.workout_exercises.reduce(
-        (s, we) =>
-          s +
-          we.sets.reduce(
-            (x, set) => x + (set.weight_kg != null && set.reps != null ? set.weight_kg * set.reps : 0),
-            0
-          ),
-        0
-      ),
-    0
-  )
-  return { volume }
-}
-
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <Card className="p-4 sm:p-5">
-      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-zinc-50">{value}</p>
-      {sub ? <p className="mt-0.5 text-xs text-zinc-500">{sub}</p> : null}
-    </Card>
-  )
-}
-
 export default async function DashboardPage() {
   const supabase = await createClient()
   const user = await requireUser()
 
   const weekStart = startOfWeek()
-  const [{ data: profile }, { count: totalWorkouts }, { count: workoutsThisWeek }, { data: recent }, { data: measurements }, { volume }, { data: allDateRows }] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('full_name, height_cm')
-        .eq('id', user.id)
-        .maybeSingle(),
-      supabase.from('workouts').select('id', { count: 'exact', head: true }),
-      supabase.from('workouts').select('id', { count: 'exact', head: true }).gte('date', weekStart),
-      supabase
-        .from('workouts')
-        .select('id, date, notes, workout_exercises(exercises(name))')
-        .order('date', { ascending: false })
-        .limit(3),
-      supabase
-        .from('body_measurements')
-        .select('measured_on, weight_kg')
-        .order('measured_on', { ascending: true }),
-      fetchTotalVolume(supabase),
-      supabase
-        .from('workouts')
-        .select('date')
-        .order('date', { ascending: false })
-        .limit(500),
-    ])
+  const [
+    { data: profile },
+    { count: workoutsThisWeek },
+    { data: recent },
+    { data: allDateRows },
+    { data: activePlan },
+    { data: todayWorkout },
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('workouts')
+      .select('id', { count: 'exact', head: true })
+      .gte('date', weekStart),
+    supabase
+      .from('workouts')
+      .select('id, date, notes, workout_exercises(exercises(name))')
+      .order('date', { ascending: false })
+      .limit(3),
+    supabase
+      .from('workouts')
+      .select('date')
+      .order('date', { ascending: false })
+      .limit(500),
+    supabase
+      .from('user_plans')
+      .select('id, starts_on, schedule, plans(id, name, days_count)')
+      .eq('active', true)
+      .maybeSingle(),
+    supabase
+      .from('workouts')
+      .select('id, date, workout_exercises(exercises(name))')
+      .eq('date', new Date().toLocaleDateString('en-CA'))
+      .maybeSingle(),
+  ])
 
-  const totalVolume = volume
-  const currentWeight = measurements?.[measurements.length - 1]?.weight_kg ?? null
-  const firstName = profile?.full_name?.split(' ')[0] ?? (user.email ? user.email.split('@')[0] : 'Athlete')
-  const streaks = computeWorkoutStreaks((allDateRows ?? []).map((r) => r.date))
-  const achievements = getAchievements(totalWorkouts ?? 0, streaks.longest)
-
+  const firstName =
+    profile?.full_name?.split(' ')[0] ??
+    (user.email ? user.email.split('@')[0] : 'Athlete')
+  const streaks = computeWorkoutStreaks(
+    (allDateRows ?? []).map((r) => r.date)
+  )
   const recentRows = (recent ?? []) as unknown as RecentRow[]
+  const plan = (activePlan ?? null) as unknown as UserPlanRow | null
+  const doneToday = (todayWorkout ?? null) as unknown as TodayWorkoutRow | null
+
+  const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const todayIdx = (new Date().getDay() + 6) % 7
+  const today = localDateISO()
+
+  let planLabel = 'Training plan'
+  let dayLabel = 'Training day'
+  if (plan) {
+    const shortName = plan.plans?.name?.match(/^\d+-Day/i)?.[0] ?? null
+    planLabel = shortName ? `${shortName} Plan` : plan.plans?.name ?? 'Training plan'
+
+    const { data: planDays } = await supabase
+      .from('plan_days')
+      .select('id, name, position')
+      .eq('plan_id', plan.plans?.id ?? '')
+    const planDayRows = (planDays ?? []) as Array<{ id: string; name: string; position: number }>
+    const dayNameById = new Map(planDayRows.map((pd) => [pd.id, pd.name]))
+
+    const saved = plan.schedule
+    const schedule: ScheduleSlotList =
+      saved && saved.length > 0
+        ? saved
+        : defaultScheduleForDays(planDayRows, plan.plans?.days_count ?? 3)
+
+    if (schedule.length > 0) {
+      const daysElapsed = Math.max(daysBetween(plan.starts_on, today), 0)
+      const slotIndex =
+        schedule.length === 7 ? weekdayIndex(today) : daysElapsed % schedule.length
+      const slot = schedule[slotIndex] as ScheduleSlot
+      if (slot.kind === REST) {
+        dayLabel = 'Rest day'
+      } else if (slot.kind === 'custom') {
+        dayLabel = `${slot.name} day`
+      } else {
+        dayLabel = `${dayNameById.get(slot.planDayId) ?? 'Training'} day`
+      }
+    }
+  }
+
+  const quotes = [
+    { text: 'The only bad workout is the one that didn\u2019t happen.', emoji: '🔥' },
+    { text: 'Strength doesn\u2019t come from what you can do. It comes from overcoming what you once thought you couldn\u2019t.', emoji: '💪' },
+    { text: 'The pain you feel today will be the strength you feel tomorrow.', emoji: '⚡' },
+    { text: 'Your body can stand almost anything. It\u2019s your mind you have to convince.', emoji: '🧠' },
+    { text: 'The clock is ticking. Are you becoming the person you want to be?', emoji: '⏰' },
+    { text: 'Success isn\u2019t always about greatness. It\u2019s about consistency.', emoji: '🏆' },
+    { text: 'Rest when you need to. Just don\u2019t quit.', emoji: '🛌' },
+  ]
+  const dailyQuote = quotes[todayIdx]
+  const weekCount = workoutsThisWeek ?? 0
+  const motivation =
+    weekCount === 0
+      ? { text: 'Every journey starts with a single step.', emoji: '🚀' }
+      : weekCount <= 2
+        ? { text: "You're building momentum. Keep stacking sessions.", emoji: '📈' }
+        : weekCount <= 4
+          ? { text: 'Consistency is changing your life. One rep at a time.', emoji: '🔥' }
+          : { text: "Unstoppable. You\u2019re rewriting what your body can do.", emoji: '⚡' }
+
+  const year = new Date().getFullYear()
+  const month = new Date().getMonth()
+  const monthFull = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const todayDay = new Date().getDate()
+  const completedDates = new Set((allDateRows ?? []).map((r) => r.date))
 
   return (
     <div>
       <PageHeader
-        title={totalWorkouts === 0 ? `Welcome, ${firstName} 💪` : `Keep it up, ${firstName}`}
-        description="Your training at a glance."
+        title={`Good ${todayIdx < 5 ? 'morning' : 'evening'}, ${firstName}`}
+        description={
+          doneToday
+            ? "You have trained today — nice work."
+            : plan
+              ? 'Ready to train?'
+              : 'Welcome to IronTrack.'
+        }
         action={
-          <LinkButton href="/today" variant="primary">
-            Today&apos;s plan
-          </LinkButton>
+          plan ? (
+            <LinkButton href="/today" variant="primary">
+              {doneToday ? 'View today' : 'Start today'}
+            </LinkButton>
+          ) : (
+            <LinkButton href="/plans" variant="primary">
+              Browse plans
+            </LinkButton>
+          )
         }
       />
 
-      <Card className="mb-4 p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-6">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🔥</span>
-            <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Streak</p>
-              <p className="text-2xl font-bold text-zinc-50">
-                {streaks.current} day{streaks.current === 1 ? '' : 's'}
+      {/* Today card */}
+      {plan ? (
+        <Card className="mb-4 overflow-hidden p-0">
+          <div className="flex items-stretch">
+            <div className="flex flex-1 flex-col justify-center p-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                {doneToday ? "Today's session" : 'Up next'}
               </p>
-              <p className="text-xs text-zinc-500">
-                {streaks.current === 0 ? 'Log a workout to start one' : 'Keep it going!'}
+              <p className="mt-1 text-lg font-bold text-zinc-50">
+                {dayLabel} &middot; {planLabel}
               </p>
+              <div className="mt-3 flex gap-1.5">
+                {weekDays.map((d, i) => (
+                  <span
+                    key={d}
+                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold ${
+                      i === todayIdx
+                        ? 'bg-lime-400 text-zinc-950'
+                        : i < todayIdx
+                          ? 'bg-zinc-800 text-zinc-500'
+                          : 'bg-zinc-900 text-zinc-600'
+                    }`}
+                  >
+                    {d[0]}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="flex w-24 items-center justify-center bg-lime-400/10">
+              {doneToday ? (
+                <span className="text-3xl">✅</span>
+              ) : (
+                <span className="text-3xl">💪</span>
+              )}
             </div>
           </div>
-          <div className="border-l border-zinc-800 pl-6">
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Best</p>
+        </Card>
+      ) : (
+        <Card className="mb-4 p-5">
+          <p className="font-semibold text-zinc-100">No active plan</p>
+          <p className="mt-1 text-sm text-zinc-500">
+            Pick a training plan to get your schedule and daily sessions.
+          </p>
+          <LinkButton href="/plans" variant="secondary" className="mt-3">
+            Browse plans
+          </LinkButton>
+        </Card>
+      )}
+
+      {/* Key stats */}
+      <div className="mb-4 grid grid-cols-2 gap-3">
+        <Card className="p-4">
+          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-base">🔥</span> Streak
+          </p>
+          <div className="mt-1 flex items-baseline gap-2">
             <p className="text-2xl font-bold text-zinc-50">
-              {streaks.longest} day{streaks.longest === 1 ? '' : 's'}
+              {streaks.current}
             </p>
-            <p className="text-xs text-zinc-500">Personal record</p>
+            <p className="text-sm text-zinc-500">
+              day{streaks.current === 1 ? '' : 's'}
+            </p>
+          </div>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {streaks.current === 0
+              ? 'Train today to start one'
+              : streaks.current === streaks.longest
+                ? '🎉 Best ever!'
+                : `${streaks.longest} day best`}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
+            <span className="text-base">💬</span> Daily quote
+          </p>
+          <p className="mt-2 text-sm font-semibold leading-relaxed text-zinc-300">
+            {dailyQuote.emoji} &ldquo;{dailyQuote.text}&rdquo;
+          </p>
+        </Card>
+      </div>
+
+      {/* Active month */}
+      <Card className="mb-4 p-4">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-zinc-100">{monthFull}</p>
+          <span className="text-[10px] text-zinc-500">
+            {weekCount} workout{weekCount === 1 ? '' : 's'} this week
+          </span>
+        </div>
+        <div className="mt-2 grid grid-cols-7 justify-items-center">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+            <span key={`h${i}`} className="text-[10px] font-semibold text-zinc-500">
+              {d}
+            </span>
+          ))}
+          {Array.from({ length: firstWeekday }).map((_, i) => (
+            <span key={`e${i}`} />
+          ))}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+            const done = completedDates.has(dateStr) || (day === todayDay && Boolean(doneToday))
+            const isToday = day === todayDay
+            return (
+              <span
+                key={day}
+                className={`relative flex h-8 w-8 items-center justify-center rounded-full text-xs ${
+                  done
+                    ? 'bg-lime-400 font-semibold text-zinc-950'
+                    : isToday
+                      ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
+                      : 'text-zinc-600'
+                }`}
+              >
+                {day}
+                {done && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-zinc-950 text-[6px] font-bold leading-none text-lime-400">
+                    ✓
+                  </span>
+                )}
+              </span>
+            )
+          })}
+        </div>
+        <p className="mt-2 text-[10px] leading-snug text-zinc-500">
+          {motivation.emoji} {motivation.text}
+        </p>
+      </Card>
+
+      {/* Exercise spotlight */}
+      <Card className="mb-4 overflow-hidden p-0">
+        <div className="flex items-stretch">
+          <div className="flex flex-1 flex-col justify-center p-5">
+            <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
+              <span className="text-base">💀</span> Exercise spotlight
+            </p>
+            <p className="mt-1 text-base font-bold text-zinc-50">
+              Deadlift
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">
+              The king of compound movements. Hits your back, glutes, hamstrings, and core
+              in one powerful pull. Master the hinge, own the weight.
+            </p>
+          </div>
+          <div className="flex w-20 items-center justify-center bg-zinc-900">
+            <span className="text-5xl">🏋️</span>
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Workouts logged" value={String(totalWorkouts)} />
-        <StatCard label="This week" value={String(workoutsThisWeek)} sub="Sessions this week" />
-        <StatCard label="Total volume" value={`${formatNumber(totalVolume)} kg`} sub="All time" />
-        <StatCard
-          label="Current weight"
-          value={currentWeight != null ? `${formatNumber(currentWeight, 2)} kg` : '—'}
-          sub={
-            measurements && measurements.length > 1
-              ? `Last logged ${formatDate(measurements[measurements.length - 1].measured_on)}`
-              : 'Log on Progress page'
-          }
-        />
-      </div>
-
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Link href="/today" className="group">
-          <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
-            <p className="font-semibold text-zinc-100">Today&apos;s plan</p>
-            <p className="mt-1 text-sm text-zinc-500">Check off your prescribed session.</p>
-          </Card>
-        </Link>
-        <Link href="/plans" className="group">
-          <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
-            <p className="font-semibold text-zinc-100">Training plans</p>
-            <p className="mt-1 text-sm text-zinc-500">3 to 7-day splits with a baked-in routine.</p>
-          </Card>
-        </Link>
-        <Link href="/messages" className="group">
-          <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
-            <p className="font-semibold text-zinc-100">Messages</p>
-            <p className="mt-1 text-sm text-zinc-500">Notes from the app owner.</p>
-          </Card>
-        </Link>
-      </div>
-
-      <div className="mt-10">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-100">Achievements</h2>
-          <Link href="/achievements" className="text-sm font-medium text-lime-400 hover:text-lime-300">
-            View all
-          </Link>
-        </div>
-        <AchievementsCompact achievements={achievements} />
-      </div>
-
-      <div className="mt-10">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-zinc-100">Recent workouts</h2>
-          <Link href="/history" className="text-sm font-medium text-lime-400 hover:text-lime-300">
+      {/* Recent workouts */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-zinc-100">Recent</h2>
+          <Link
+            href="/history"
+            className="text-xs font-medium text-lime-400 hover:text-lime-300"
+          >
             View all
           </Link>
         </div>
 
-{recentRows.length === 0 ? (
-            <EmptyState
-              title="No workouts yet"
-              description="Start a training plan and your sessions will show up here."
-              action={<LinkButton href="/plans">Browse plans</LinkButton>}
-            />
-          ) : (
-          <div className="grid gap-3 sm:grid-cols-3">
+        {recentRows.length === 0 ? (
+          <EmptyState
+            title="No workouts yet"
+            description="Start a plan and your sessions will show up here."
+            action={<LinkButton href="/plans">Browse plans</LinkButton>}
+          />
+        ) : (
+          <div className="space-y-2">
             {recentRows.map((w) => {
               const names = w.workout_exercises
                 .map((we) => we.exercises?.name)
                 .filter((n): n is string => Boolean(n))
               return (
-                <Card key={w.id} className="h-full p-4 transition-colors group-hover:border-zinc-700">
-                <div className="flex items-start justify-between gap-3">
-                  <Link href={`/history/${w.id}`} className="group min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-zinc-100">{formatDate(w.date)}</p>
-                    {w.notes ? (
-                      <p className="mt-1 line-clamp-1 text-xs text-zinc-500">{w.notes}</p>
-                    ) : null}
+                <Card key={w.id} className="flex items-center gap-4 p-4">
+                  <Link
+                    href={`/history/${w.id}`}
+                    className="min-w-0 flex-1"
+                  >
+                    <p className="truncate text-sm font-semibold text-zinc-100">
+                      {formatDate(w.date)}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {names.slice(0, 3).map((name) => (
+                        <Badge key={name} tone="muted">
+                          {name}
+                        </Badge>
+                      ))}
+                      {names.length > 3 ? (
+                        <Badge tone="muted">+{names.length - 3}</Badge>
+                      ) : null}
+                    </div>
                   </Link>
                   <DeleteWorkoutButton workoutId={w.id} />
-                </div>
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  <Badge tone="accent">{names.length} exercises</Badge>
-                  {names.slice(0, 2).map((name) => (
-                    <Badge key={name} tone="muted">
-                      {name}
-                    </Badge>
-                  ))}
-                </div>
-              </Card>
+                </Card>
               )
             })}
           </div>

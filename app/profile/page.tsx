@@ -95,12 +95,9 @@ export default async function ProfilePage() {
               </dd>
             </div>
           </dl>
-          <div className="mt-6 rounded-xl border border-lime-400/20 bg-lime-400/5 p-4 text-sm text-zinc-300">
-            Update your name and height below — they keep your profile and progress
-            right.
-          </div>
         </Card>
       </div>
+
     </div>
   )
 }

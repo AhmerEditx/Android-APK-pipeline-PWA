@@ -42,6 +42,68 @@ function seedSets(sets: number): DraftSet[] {
   return Array.from({ length: count }, () => ({ done: false, weight: '', reps: '' }))
 }
 
+function SetProgress({
+  typed,
+  last,
+}: {
+  typed: DraftSet
+  last: { weight_kg: number | null; reps: number | null } | undefined
+}) {
+  if (!last) return null
+
+  const weight = toNumber(typed.weight)
+  const reps = toNumber(typed.reps)
+  const lastWeight = last.weight_kg
+  const lastReps = last.reps
+  const base = 'mt-1 pl-[4rem] text-[10px] font-medium sm:pl-[5.5rem]'
+
+  if (weight == null && reps == null) {
+    return (
+      <p className={`${base} text-zinc-600`}>
+        Last: {lastWeight != null ? `${formatNumber(lastWeight, 2)} kg` : '—'} × {lastReps ?? '—'}
+      </p>
+    )
+  }
+
+  if (weight != null) {
+    let tone = 'text-zinc-500'
+    let msg: string
+    if (lastWeight == null) {
+      msg = 'First time logging a weight for this set.'
+    } else if (weight > lastWeight) {
+      tone = 'text-lime-400'
+      const diff = Math.round((weight - lastWeight) * 100) / 100
+      msg = `↑ Pushing! ${formatNumber(weight, 2)} kg vs last ${formatNumber(lastWeight, 2)} kg (+${formatNumber(diff, 2)})`
+    } else if (weight < lastWeight) {
+      tone = 'text-amber-400'
+      const diff = Math.round((lastWeight - weight) * 100) / 100
+      msg = `↓ Below last — last was ${formatNumber(lastWeight, 2)} kg (${formatNumber(weight, 2)} kg, −${formatNumber(diff, 2)})`
+    } else {
+      msg = `Same as last — ${formatNumber(lastWeight, 2)} kg`
+    }
+    return <p className={`${base} ${tone}`}>{msg}</p>
+  }
+
+  if (reps != null) {
+    let tone = 'text-zinc-500'
+    let msg: string
+    if (lastReps == null) {
+      msg = 'First time logging reps for this set.'
+    } else if (reps > lastReps) {
+      tone = 'text-lime-400'
+      msg = `↑ More reps than last — ${reps} vs ${lastReps} (+${reps - lastReps})`
+    } else if (reps < lastReps) {
+      tone = 'text-amber-400'
+      msg = `↓ Fewer reps than last — last was ${lastReps} (${reps})`
+    } else {
+      msg = `Same reps as last — ${lastReps}`
+    }
+    return <p className={`${base} ${tone}`}>{msg}</p>
+  }
+
+  return null
+}
+
 export function TodayChecklist({
   planDayId,
   dayName,
@@ -223,19 +285,11 @@ export function TodayChecklist({
             </div>
 
             {ex.last && ex.last.sets.length > 0 ? (
-              <p className="mb-4 text-xs text-zinc-500">
-                Last time ({formatDate(ex.last.date)}):{' '}
-                {ex.last.sets
-                  .map(
-                    (set) =>
-                      `${set.weight_kg != null ? `${formatNumber(set.weight_kg, 2)} kg` : '—'} × ${
-                        set.reps ?? '—'
-                      }`
-                  )
-                  .join(' · ')}
+              <p className="mb-3 text-xs text-zinc-500">
+                Last time ({formatDate(ex.last.date)}) — see the set overlay below
               </p>
             ) : (
-              <p className="mb-4 text-xs text-zinc-600">First time doing this in the past 2 weeks.</p>
+              <p className="mb-3 text-xs text-zinc-600">First time doing this in the past 2 weeks.</p>
             )}
 
             <div className={`${gridCols} pb-2 text-xs font-medium uppercase tracking-wide text-zinc-500`}>
@@ -248,45 +302,48 @@ export function TodayChecklist({
 
             <div className="space-y-2">
               {ex.sets.map((s, setIndex) => (
-                <div key={setIndex} className={gridCols}>
-                  <label className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={s.done}
-                      onChange={(e) => updateSet(exIndex, setIndex, { done: e.target.checked })}
-                      className="h-4 w-4 accent-lime-400"
+                <div key={setIndex}>
+                  <div className={gridCols}>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={s.done}
+                        onChange={(e) => updateSet(exIndex, setIndex, { done: e.target.checked })}
+                        className="h-4 w-4 accent-lime-400"
+                      />
+                    </label>
+                    <span className={`text-sm font-medium ${s.done ? 'text-lime-400' : 'text-zinc-400'}`}>
+                      {setIndex + 1}
+                    </span>
+                    <Input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.5"
+                      min="0"
+                      placeholder={`Last: ${ex.last?.sets[setIndex]?.weight_kg != null ? ex.last.sets[setIndex].weight_kg : ''}`}
+                      value={s.weight}
+                      onChange={(e) => updateSet(exIndex, setIndex, { weight: e.target.value })}
                     />
-                  </label>
-                  <span className={`text-sm font-medium ${s.done ? 'text-lime-400' : 'text-zinc-400'}`}>
-                    {setIndex + 1}
-                  </span>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.5"
-                    min="0"
-                    placeholder="0"
-                    value={s.weight}
-                    onChange={(e) => updateSet(exIndex, setIndex, { weight: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    step="1"
-                    min="0"
-                    placeholder="0"
-                    value={s.reps}
-                    onChange={(e) => updateSet(exIndex, setIndex, { reps: e.target.value })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSet(exIndex, setIndex)}
-                    disabled={ex.sets.length === 1}
-                    className="text-sm text-zinc-600 transition-colors hover:text-red-400 disabled:pointer-events-none disabled:opacity-30"
-                    aria-label="Remove set"
-                  >
-                    ✕
-                  </button>
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      step="1"
+                      min="0"
+                      placeholder={`Last: ${ex.last?.sets[setIndex]?.reps ?? ''}`}
+                      value={s.reps}
+                      onChange={(e) => updateSet(exIndex, setIndex, { reps: e.target.value })}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeSet(exIndex, setIndex)}
+                      disabled={ex.sets.length === 1}
+                      className="text-sm text-zinc-600 transition-colors hover:text-red-400 disabled:pointer-events-none disabled:opacity-30"
+                      aria-label="Remove set"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <SetProgress typed={s} last={ex.last?.sets[setIndex]} />
                 </div>
               ))}
             </div>

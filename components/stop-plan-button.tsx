@@ -45,8 +45,14 @@ export function StopPlanButton({
   if (compact) {
     return (
       <div className="flex flex-col items-start gap-1.5">
-        <Button variant="secondary" size="sm" onClick={handleStop} disabled={stopping}>
-          {stopping ? 'Stopping…' : 'Stop this plan'}
+        <Button
+          variant="danger"
+          size="sm"
+          className="bg-red-600 text-white hover:bg-red-500"
+          onClick={handleStop}
+          disabled={stopping}
+        >
+          {stopping ? 'Cancelling…' : 'Cancel the active plan'}
         </Button>
         {error ? <p className="text-xs text-red-400">{error}</p> : null}
       </div>
@@ -55,9 +61,14 @@ export function StopPlanButton({
 
   return (
     <div className="flex flex-col items-start gap-2">
-      <Button variant="secondary" onClick={handleStop} disabled={stopping}>
-        {stopping ? 'Stopping…' : 'Stop this plan'}
-      </Button>
+      <Button
+          variant="danger"
+          className="bg-red-600 text-white hover:bg-red-500"
+          onClick={handleStop}
+          disabled={stopping}
+        >
+          {stopping ? 'Cancelling…' : 'Cancel the active plan'}
+        </Button>
       {error ? (
         <p className="text-sm text-red-400">{error}</p>
       ) : (

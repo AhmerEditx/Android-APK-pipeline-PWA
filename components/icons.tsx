@@ -164,3 +164,12 @@ export function TrophyIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+export function AboutIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={base(className)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6M12 7.5h.01" />
+    </svg>
+  )
+}

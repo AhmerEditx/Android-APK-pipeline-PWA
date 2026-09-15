@@ -8,6 +8,7 @@ import { App } from '@capacitor/app'
 import { createClient } from '@/lib/supabase/client'
 import { LogoutButton } from './logout-button'
 import {
+  AboutIcon,
   AdminIcon,
   BackIcon,
   ChartIcon,
@@ -156,6 +157,7 @@ export function Nav() {
     { href: '/achievements', label: 'Achievements', description: 'Milestones and streak badges', icon: TrophyIcon },
     { href: '/messages', label: 'Messages', description: 'Messages from the app', icon: MessagesIcon, badge: unread },
     { href: '/feedback', label: 'Feedback', description: 'Report a bug, suggest an idea', icon: FeedbackIcon },
+    { href: '/about', label: 'About', description: 'About the app, developer and support', icon: AboutIcon },
     { href: '/profile', label: 'Profile', description: 'Account, stats and settings', icon: ProfileIcon },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', description: 'Manage members and messages', icon: AdminIcon }] : []),
   ]

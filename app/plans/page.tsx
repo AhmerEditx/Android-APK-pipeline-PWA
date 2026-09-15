@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Badge, Card, LinkButton, PageHeader } from '@/components/ui'
+import { Badge, Card, PageHeader } from '@/components/ui'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import type { Plan } from '@/lib/supabase/types'
 import { StopPlanButton } from '@/components/stop-plan-button'
@@ -38,9 +38,6 @@ export default async function PlansPage() {
         action={
           <div className="flex flex-wrap items-center gap-2">
             {activePlan ? <StopPlanButton userPlanId={activePlan.id} compact /> : null}
-            <LinkButton href="/plans/new" variant="primary">
-              + Create plan
-            </LinkButton>
           </div>
         }
       />
@@ -54,6 +51,19 @@ export default async function PlansPage() {
         </Card>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
+          <Link href="/plans/new" className="group">
+            <Card className="flex h-full flex-col items-center justify-center gap-3 border-2 border-dashed border-zinc-800 p-8 text-center transition-colors group-hover:border-lime-400/40">
+              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-lime-400/10 text-2xl text-lime-400">
+                +
+              </span>
+              <div>
+                <p className="font-semibold text-zinc-50">Create plan</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Build your own split from scratch or clone a template.
+                </p>
+              </div>
+            </Card>
+          </Link>
           {rows.map((plan) => {
             const days = [...plan.plan_days].sort((a, b) => {
               const aPos = a as { position?: number }
@@ -71,11 +81,15 @@ export default async function PlansPage() {
                 href={`/plans/${plan.id}`}
                 className="group"
               >
-                <Card className="h-full p-5 transition-colors group-hover:border-zinc-700">
+                <Card
+                  className={`h-full p-5 transition-colors group-hover:border-zinc-700 ${
+                    isActive ? 'border-lime-400/60 bg-lime-400/5' : ''
+                  }`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-semibold text-zinc-50">{plan.name}</h2>
                     <div className="flex flex-shrink-0 items-center gap-2">
-                      {isActive ? <Badge>Active</Badge> : null}
+                      {isActive ? <Badge tone="accent">Active</Badge> : null}
                       {plan.owner_id !== null ? <Badge tone="accent">Custom</Badge> : null}
                       <Badge tone="muted">{plan.days_count} days</Badge>
                     </div>
