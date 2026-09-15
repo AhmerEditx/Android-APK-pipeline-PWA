@@ -56,27 +56,25 @@ export function computeWorkoutStreaks(dates: string[]): {
   if (unique.length === 0) return { current: 0, longest: 0 }
 
   let longest = 1
-  let streak = 1
+  let seq = 1
   for (let i = 1; i < unique.length; i++) {
-    if (addDays(unique[i], -1) === unique[i - 1]) {
-      streak++
+    if (daysBetween(unique[i - 1], unique[i]) <= 2) {
+      seq++
     } else {
-      if (streak > longest) longest = streak
-      streak = 1
+      if (seq > longest) longest = seq
+      seq = 1
     }
   }
-  if (streak > longest) longest = streak
+  if (seq > longest) longest = seq
 
   const today = localDateISO()
   const dateSet = new Set(unique)
   let current = 0
-  let d = today
-  if (!dateSet.has(d)) {
-    const y = addDays(today, -1)
-    if (dateSet.has(y)) d = y
-  }
-  while (dateSet.has(d)) {
-    current++
+  let gaps = 0
+  let d = dateSet.has(today) ? today : addDays(today, -1)
+  while (dateSet.has(d) || gaps < 1) {
+    if (dateSet.has(d)) current++
+    else gaps++
     d = addDays(d, -1)
   }
 
