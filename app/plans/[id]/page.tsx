@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/ui'
 import { StartPlanButton } from '@/components/start-plan-button'
+import { StopPlanButton } from '@/components/stop-plan-button'
 import { PlanScheduleEditor } from '@/components/plan-schedule-editor'
 import { PlanExercisesEditor, type CatalogExercise } from '@/components/plan-exercises-editor'
 import {
@@ -93,7 +94,16 @@ export default async function PlanDetailPage({
       <PageHeader
         title={row.name}
         description={row.description ?? undefined}
-        action={<StartPlanButton planId={row.id} startsOn={active?.starts_on ?? undefined} />}
+        action={
+          active ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <StartPlanButton planId={row.id} startsOn={active.starts_on ?? undefined} />
+              <StopPlanButton userPlanId={active.id} />
+            </div>
+          ) : (
+            <StartPlanButton planId={row.id} />
+          )
+        }
       />
 
       <div className="space-y-6">

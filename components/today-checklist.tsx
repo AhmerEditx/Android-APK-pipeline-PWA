@@ -123,28 +123,44 @@ export function TodayChecklist({
       if (workoutErr) throw new Error(workoutErr.message)
       const workoutId = data.id
 
-      for (let i = 0; i < exercisesToSave.length; i++) {
-        const ex = exercisesToSave[i]
-        const { data: we, error: weErr } = await supabase
-          .from('workout_exercises')
-          .insert({ workout_id: workoutId, exercise_id: ex.exerciseId, position: i })
-          .select('id')
-          .single()
-        if (weErr) throw new Error(weErr.message)
+      const { data: weRows, error: weErr } = await supabase
+        .from('workout_exercises')
+        .insert(
+          exercisesToSave.map((ex, i) => ({
+            workout_id: workoutId,
+            exercise_id: ex.exerciseId,
+            position: i,
+          }))
+        )
+        .select('id, exercise_id')
+      if (weErr) throw new Error(weErr.message)
 
+      const idByExercise = new Map((weRows ?? []).map((r) => [r.exercise_id, r.id]))
+      const setsToInsert: Array<{
+        workout_exercise_id: string
+        set_number: number
+        weight_kg: number | null
+        reps: number | null
+      }> = []
+      for (const ex of exercisesToSave) {
+        const workoutExerciseId = idByExercise.get(ex.exerciseId)
+        if (!workoutExerciseId) continue
         let setNumber = 1
         for (const s of ex.sets) {
           const weight = toNumber(s.weight)
           const reps = toNumber(s.reps)
           if (weight == null && reps == null) continue
-          const { error: setErr } = await supabase.from('sets').insert({
-            workout_exercise_id: we.id,
+          setsToInsert.push({
+            workout_exercise_id: workoutExerciseId,
             set_number: setNumber++,
             weight_kg: weight,
             reps,
           })
-          if (setErr) throw new Error(setErr.message)
         }
+      }
+      if (setsToInsert.length > 0) {
+        const { error: setErr } = await supabase.from('sets').insert(setsToInsert)
+        if (setErr) throw new Error(setErr.message)
       }
 
       setSavedId(workoutId)

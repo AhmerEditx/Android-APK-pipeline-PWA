@@ -197,19 +197,56 @@ export function WorkoutForm({ exercises, initial }: { exercises: Exercise[]; ini
         if (updateErr) throw new Error(updateErr.message)
       }
 
-      for (let i = 0; i < added.length; i++) {
-        const ex = added[i]
-        if (ex.weId) {
-          await syncSets(supabase, ex.weId, ex.sets)
-        } else {
-          const { data: we, error: weErr } = await supabase
-            .from('workout_exercises')
-            .insert({ workout_id: workoutId, exercise_id: ex.exercise.id, position: i })
-            .select('id')
-            .single()
-          if (weErr) throw new Error(weErr.message)
-          await syncSets(supabase, we.id, ex.sets)
+      const positionByExercise = new Map<DraftExercise, number>()
+      added.forEach((ex, i) => positionByExercise.set(ex, i))
+      const existing = added.filter((ex) => Boolean(ex.weId))
+      const created = added.filter((ex) => !ex.weId)
+
+      for (const ex of existing) {
+        await syncSets(supabase, ex.weId!, ex.sets)
+      }
+
+      const createdWeIds = new Map<string, DraftExercise>()
+      if (created.length > 0) {
+        const { data: weRows, error: weErr } = await supabase
+          .from('workout_exercises')
+          .insert(
+            created.map((ex) => ({
+              workout_id: workoutId,
+              exercise_id: ex.exercise.id,
+              position: positionByExercise.get(ex) ?? 0,
+            }))
+          )
+          .select('id, exercise_id')
+        if (weErr) throw new Error(weErr.message)
+        for (const row of weRows ?? []) {
+          const ex = created.find((c) => c.exercise.id === row.exercise_id)
+          if (ex) createdWeIds.set(row.id, ex)
         }
+      }
+
+      const setsToInsert: Array<{
+        workout_exercise_id: string
+        set_number: number
+        weight_kg: number | null
+        reps: number | null
+        is_warmup: boolean
+      }> = []
+      for (const [weId, ex] of createdWeIds) {
+        let setNumber = 1
+        for (const s of ex.sets) {
+          setsToInsert.push({
+            workout_exercise_id: weId,
+            set_number: setNumber++,
+            weight_kg: toNumber(s.weight),
+            reps: toNumber(s.reps),
+            is_warmup: s.is_warmup,
+          })
+        }
+      }
+      if (setsToInsert.length > 0) {
+        const { error: setErr } = await supabase.from('sets').insert(setsToInsert)
+        if (setErr) throw new Error(setErr.message)
       }
 
       for (const id of deletedSetIds) {

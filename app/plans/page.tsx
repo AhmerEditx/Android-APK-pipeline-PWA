@@ -11,13 +11,21 @@ export const metadata = { title: 'Training Plans' }
 
 export default async function PlansPage() {
   const supabase = await createClient()
-  await requireUser()
+  const user = await requireUser()
 
-  const { data } = await supabase
-    .from('plans')
-    .select('*, plan_days(name, plan_day_exercises(id))')
-    .eq('is_public', true)
-    .order('days_count')
+  const [{ data }, { data: activePlan }] = await Promise.all([
+    supabase
+      .from('plans')
+      .select('*, plan_days(name, plan_day_exercises(id))')
+      .eq('is_public', true)
+      .order('days_count'),
+    supabase
+      .from('user_plans')
+      .select('plan_id')
+      .eq('user_id', user.id)
+      .eq('active', true)
+      .maybeSingle(),
+  ])
 
   const rows = (data ?? []) as unknown as PlanRow[]
 
@@ -47,6 +55,7 @@ export default async function PlansPage() {
               (sum, day) => sum + day.plan_day_exercises.length,
               0
             )
+            const isActive = activePlan?.plan_id === plan.id
             return (
               <Link
                 key={plan.id}
@@ -56,7 +65,10 @@ export default async function PlansPage() {
                 <Card className="h-full p-5 transition-colors group-hover:border-zinc-700">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-semibold text-zinc-50">{plan.name}</h2>
-                    <Badge tone="accent">{plan.days_count} days</Badge>
+                    <div className="flex flex-shrink-0 items-center gap-2">
+                      {isActive ? <Badge>Active</Badge> : null}
+                      <Badge tone="accent">{plan.days_count} days</Badge>
+                    </div>
                   </div>
                   {plan.description ? (
                     <p className="mt-1.5 text-sm text-zinc-500">{plan.description}</p>

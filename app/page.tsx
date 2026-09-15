@@ -18,6 +18,41 @@ type RecentRow = {
   workout_exercises: Array<{ exercises: { name: string } | null }>
 }
 
+async function fetchTotalVolume(
+  supabase: Awaited<ReturnType<typeof createClient>>
+): Promise<{ volume: number }> {
+  const rpc = supabase.rpc as unknown as (name: string) => Promise<{
+    data: number | null
+    error: { code?: string; message?: string } | null
+  }>
+  const { data, error } = await rpc('get_total_volume')
+  if (error?.code !== 'PGRST202') {
+    if (error) throw new Error(error.message ?? 'Could not compute volume.')
+    return { volume: data ?? 0 }
+  }
+  const { data: rows } = await supabase
+    .from('workouts')
+    .select('id, date, workout_exercises(sets(weight_kg, reps))')
+    .order('date', { ascending: false })
+    .limit(1000)
+  const volumeRows = (rows ?? []) as unknown as WorkoutVolumeRow[]
+  const volume = volumeRows.reduce(
+    (sum, w) =>
+      sum +
+      w.workout_exercises.reduce(
+        (s, we) =>
+          s +
+          we.sets.reduce(
+            (x, set) => x + (set.weight_kg != null && set.reps != null ? set.weight_kg * set.reps : 0),
+            0
+          ),
+        0
+      ),
+    0
+  )
+  return { volume }
+}
+
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <Card className="p-4 sm:p-5">
@@ -32,7 +67,8 @@ export default async function DashboardPage() {
   const supabase = await createClient()
   const user = await requireUser()
 
-  const [{ data: profile }, { count: totalWorkouts }, { data: workoutRows }, { data: recent }, { data: measurements }] =
+  const weekStart = startOfWeek()
+  const [{ data: profile }, { count: totalWorkouts }, { count: workoutsThisWeek }, { data: recent }, { data: measurements }, { volume }] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -40,7 +76,7 @@ export default async function DashboardPage() {
         .eq('id', user.id)
         .maybeSingle(),
       supabase.from('workouts').select('id', { count: 'exact', head: true }),
-      supabase.from('workouts').select('id, date, workout_exercises(sets(weight_kg, reps))').order('date', { ascending: false }).limit(1000),
+      supabase.from('workouts').select('id', { count: 'exact', head: true }).gte('date', weekStart),
       supabase
         .from('workouts')
         .select('id, date, notes, workout_exercises(exercises(name))')
@@ -50,25 +86,10 @@ export default async function DashboardPage() {
         .from('body_measurements')
         .select('measured_on, weight_kg')
         .order('measured_on', { ascending: true }),
+      fetchTotalVolume(supabase),
     ])
 
-  const rows = (workoutRows ?? []) as unknown as WorkoutVolumeRow[]
-  const weekStart = startOfWeek()
-  const workoutsThisWeek = rows.filter((w) => w.date >= weekStart).length
-  const totalVolume = rows.reduce(
-    (sum, w) =>
-      sum +
-      w.workout_exercises.reduce(
-        (s, we) =>
-          s +
-          we.sets.reduce(
-            (x, set) => x + (set.weight_kg != null && set.reps != null ? set.weight_kg * set.reps : 0),
-            0
-          ),
-        0
-      ),
-    0
-  )
+  const totalVolume = volume
   const currentWeight = measurements?.[measurements.length - 1]?.weight_kg ?? null
   const firstName = profile?.full_name?.split(' ')[0] ?? (user.email ? user.email.split('@')[0] : 'Athlete')
 
