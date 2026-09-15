@@ -17,7 +17,6 @@ import {
   MessagesIcon,
   MoreIcon,
   PlansIcon,
-  PlusIcon,
   ProfileIcon,
   TodayIcon,
 } from './icons'
@@ -26,7 +25,6 @@ const desktopLinks = [
   { href: '/', label: 'Dashboard' },
   { href: '/today', label: 'Today' },
   { href: '/plans', label: 'Plans' },
-  { href: '/workouts/new', label: 'Log Workout' },
   { href: '/history', label: 'History' },
   { href: '/progress', label: 'Progress' },
   { href: '/profile', label: 'Profile' },
@@ -35,7 +33,7 @@ const desktopLinks = [
 const tabBarLinks = [
   { href: '/', label: 'Home', icon: HomeIcon },
   { href: '/today', label: 'Today', icon: TodayIcon },
-  { href: '/workouts/new', label: 'Log', icon: PlusIcon },
+  { href: '/plans', label: 'Plans', icon: PlansIcon },
   { href: '/progress', label: 'Progress', icon: ChartIcon },
 ]
 

@@ -35,8 +35,8 @@ export default async function HistoryPage() {
           title="No workouts yet"
           description="Your logged sessions will appear here."
           action={
-            <Link href="/workouts/new" className="inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300">
-              + Log workout
+            <Link href="/today" className="inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300">
+              Go to today&apos;s plan
             </Link>
           }
         />

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Badge, Card, PageHeader } from '@/components/ui'
+import { Badge, Card, LinkButton, PageHeader } from '@/components/ui'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import type { Plan } from '@/lib/supabase/types'
 
@@ -17,7 +17,7 @@ export default async function PlansPage() {
     supabase
       .from('plans')
       .select('*, plan_days(name, plan_day_exercises(id))')
-      .eq('is_public', true)
+      .or(`is_public.eq.true,owner_id.eq.${user.id}`)
       .order('days_count'),
     supabase
       .from('user_plans')
@@ -34,6 +34,11 @@ export default async function PlansPage() {
       <PageHeader
         title="Training plans"
         description="Pick a weekly split, start it, and check off each day from the Today page."
+        action={
+          <LinkButton href="/plans/new" variant="primary">
+            + Create plan
+          </LinkButton>
+        }
       />
 
       {rows.length === 0 ? (
@@ -67,7 +72,8 @@ export default async function PlansPage() {
                     <h2 className="font-semibold text-zinc-50">{plan.name}</h2>
                     <div className="flex flex-shrink-0 items-center gap-2">
                       {isActive ? <Badge>Active</Badge> : null}
-                      <Badge tone="accent">{plan.days_count} days</Badge>
+                      {plan.owner_id !== null ? <Badge tone="accent">Custom</Badge> : null}
+                      <Badge tone="muted">{plan.days_count} days</Badge>
                     </div>
                   </div>
                   {plan.description ? (

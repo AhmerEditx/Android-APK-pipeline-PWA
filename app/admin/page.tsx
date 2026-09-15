@@ -1,6 +1,7 @@
 import { Badge, Card, PageHeader } from '@/components/ui'
 import { AdminUserActions } from '@/components/admin-user-actions'
 import { BroadcastForm } from '@/components/admin-broadcast-form'
+import { AdminMessageManager } from '@/components/admin-message-manager'
 import { createClient, requireAdmin } from '@/lib/supabase/server'
 import { REST, restSchedulePositions, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { daysBetween, formatDate, localDateISO, weekdayIndex } from '@/lib/utils'
@@ -152,25 +153,16 @@ export default async function AdminPage() {
       </div>
 
       <h2 className="mb-3 mt-10 text-lg font-semibold text-zinc-100">All messages</h2>
-      <div className="space-y-3">
-        {messageRows.length === 0 ? (
-          <Card className="p-5 text-sm text-zinc-500">No messages sent yet.</Card>
-        ) : (
-          messageRows.map((msg) => (
-            <Card key={msg.id} className="p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="font-semibold text-zinc-100">{msg.subject}</p>
-                <div className="flex items-center gap-2">
-                  <Badge tone="muted">to {emailOf.get(msg.recipient_id)}</Badge>
-                  {msg.read_at ? <Badge tone="default">read</Badge> : <Badge tone="accent">unread</Badge>}
-                </div>
-              </div>
-              <p className="mt-1 text-sm text-zinc-400">{msg.body}</p>
-              <p className="mt-2 text-xs text-zinc-600">{formatDate(msg.created_at)}</p>
-            </Card>
-          ))
-        )}
-      </div>
+      <AdminMessageManager
+        messages={messageRows.map((msg) => ({
+          id: msg.id,
+          subject: msg.subject,
+          body: msg.body,
+          created_at: msg.created_at,
+          read_at: msg.read_at,
+          recipient: emailOf.get(msg.recipient_id) ?? 'User',
+        }))}
+      />
     </div>
   )
 }

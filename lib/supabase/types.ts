@@ -58,6 +58,7 @@ export type Plan = {
   description: string | null
   days_count: number
   is_public: boolean
+  owner_id: string | null
   created_at: string
 }
 
@@ -196,6 +197,7 @@ export interface Database {
           description?: string | null
           days_count: number
           is_public?: boolean
+          owner_id?: string | null
           created_at?: string
         }
         Update: Partial<Plan>

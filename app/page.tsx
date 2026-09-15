@@ -101,8 +101,8 @@ export default async function DashboardPage() {
         title={totalWorkouts === 0 ? `Welcome, ${firstName} 💪` : `Keep it up, ${firstName}`}
         description="Your training at a glance."
         action={
-          <LinkButton href="/workouts/new" variant="primary">
-            + Log workout
+          <LinkButton href="/today" variant="primary">
+            Today&apos;s plan
           </LinkButton>
         }
       />
@@ -151,13 +151,13 @@ export default async function DashboardPage() {
           </Link>
         </div>
 
-        {recentRows.length === 0 ? (
-          <EmptyState
-            title="No workouts yet"
-            description="Log your first session to start building your training history."
-            action={<LinkButton href="/workouts/new">+ Log workout</LinkButton>}
-          />
-        ) : (
+{recentRows.length === 0 ? (
+            <EmptyState
+              title="No workouts yet"
+              description="Start a training plan and your sessions will show up here."
+              action={<LinkButton href="/plans">Browse plans</LinkButton>}
+            />
+          ) : (
           <div className="grid gap-3 sm:grid-cols-3">
             {recentRows.map((w) => {
               const names = w.workout_exercises

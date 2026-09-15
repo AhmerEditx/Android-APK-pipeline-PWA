@@ -173,10 +173,10 @@ export default async function TodayPage() {
             Your next workout will appear here automatically.
           </p>
           <Link
-            href="/workouts/new"
+            href="/exercises"
             className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300"
           >
-            Log a workout anyway
+            Browse the exercise library
           </Link>
         </div>
       </div>
@@ -197,10 +197,10 @@ export default async function TodayPage() {
             This is an extra working day you added to your schedule. Log whatever feels right.
           </p>
           <Link
-            href="/workouts/new"
+            href="/exercises"
             className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300"
           >
-            Log this workout
+            Refer to the exercise library
           </Link>
         </div>
       </div>
