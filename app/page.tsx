@@ -21,10 +21,11 @@ type RecentRow = {
 async function fetchTotalVolume(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<{ volume: number }> {
-  const rpc = supabase.rpc as unknown as (name: string) => Promise<{
-    data: number | null
-    error: { code?: string; message?: string } | null
-  }>
+  const rpc = (name: string) =>
+    supabase.rpc(name) as unknown as Promise<{
+      data: number | null
+      error: { code?: string; message?: string } | null
+    }>
   const { data, error } = await rpc('get_total_volume')
   if (error?.code !== 'PGRST202') {
     if (error) throw new Error(error.message ?? 'Could not compute volume.')
