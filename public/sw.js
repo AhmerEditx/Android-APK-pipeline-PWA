@@ -1,5 +1,5 @@
 /* IronTrack service worker — app-shell + asset caching. */
-const CACHE = 'irontrack-v2'
+const CACHE = 'irontrack-v3'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
