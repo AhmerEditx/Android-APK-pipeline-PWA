@@ -1,10 +1,11 @@
-import { Badge, Card, PageHeader } from '@/components/ui'
-import { AdminUserActions } from '@/components/admin-user-actions'
+import { Card, PageHeader } from '@/components/ui'
+import { AdminMembersList, type AdminMember } from '@/components/admin-members-list'
+import { AdminFeedbackManager, type AdminFeedback } from '@/components/admin-feedback-manager'
 import { BroadcastForm } from '@/components/admin-broadcast-form'
 import { AdminMessageManager } from '@/components/admin-message-manager'
 import { createClient, requireAdmin } from '@/lib/supabase/server'
 import { REST, restSchedulePositions, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
-import { daysBetween, formatDate, localDateISO, weekdayIndex } from '@/lib/utils'
+import { daysBetween, localDateISO, weekdayIndex } from '@/lib/utils'
 
 type UserRow = {
   id: string
@@ -32,13 +33,23 @@ type MessageRow = {
   read_at: string | null
 }
 
+type FeedbackRow = {
+  id: string
+  user_id: string
+  kind: 'bug' | 'suggestion'
+  message: string
+  status: 'new' | 'resolved'
+  created_at: string
+  profiles: { full_name: string | null; email: string | null } | null
+}
+
 export const metadata = { title: 'Admin' }
 
 export default async function AdminPage() {
   const supabase = await createClient()
   await requireAdmin()
 
-  const [{ data: users }, { data: planRows }, { data: workoutRows }, { data: messages }] =
+  const [{ data: users }, { data: planRows }, { data: workoutRows }, { data: messages }, { data: feedbackRows }] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -50,6 +61,11 @@ export default async function AdminPage() {
         .eq('active', true),
       supabase.from('workouts').select('user_id, date').order('date', { ascending: false }),
       supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50),
+      supabase
+        .from('feedback')
+        .select('id, user_id, kind, message, status, created_at, profiles(full_name, email)')
+        .order('created_at', { ascending: false })
+        .limit(100),
     ])
 
   const userRows = (users ?? []) as unknown as UserRow[]
@@ -72,6 +88,31 @@ export default async function AdminPage() {
 
   const messageRows = (messages ?? []) as unknown as MessageRow[]
   const emailOf = new Map(userRows.map((u) => [u.id, u.email ?? u.full_name ?? 'User']))
+
+  const feedback: AdminFeedback[] = ((feedbackRows ?? []) as unknown as FeedbackRow[]).map(
+    (f) => ({
+      id: f.id,
+      kind: f.kind,
+      message: f.message,
+      status: f.status,
+      created_at: f.created_at,
+      reporter: f.profiles?.full_name ?? f.profiles?.email ?? 'User',
+    })
+  )
+
+  const members: AdminMember[] = userRows.map((user) => {
+    const s = stats.get(user.id) ?? { count: 0, last: null }
+    return {
+      id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      is_admin: user.is_admin,
+      created_at: user.created_at,
+      plan: planSummary(user.id),
+      workoutCount: s.count,
+      lastWorkout: s.last,
+    }
+  })
 
   function planSummary(userId: string): string | null {
     const p = planMap.get(userId)
@@ -106,50 +147,10 @@ export default async function AdminPage() {
         <BroadcastForm userIds={userRows.map((u) => u.id)} />
       </Card>
 
-      <h2 className="mb-3 text-lg font-semibold text-zinc-100">
-        Members <span className="text-sm font-normal text-zinc-500">({userRows.length})</span>
-      </h2>
-      <div className="space-y-3">
-        {userRows.length === 0 ? (
-          <Card className="p-5 text-sm text-zinc-500">No users yet.</Card>
-        ) : (
-          userRows.map((user) => {
-            const s = stats.get(user.id) ?? { count: 0, last: null }
-            const plan = planSummary(user.id)
-            return (
-              <Card key={user.id} className="p-5">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-zinc-50">
-                      {user.full_name ?? 'Unnamed user'}
-                    </p>
-                    <p className="mt-0.5 text-sm text-zinc-400">{user.email ?? 'No email recorded'}</p>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      <Badge tone={user.is_admin ? 'accent' : 'muted'}>
-                        {user.is_admin ? 'Admin' : 'Member'}
-                      </Badge>
-                      {plan ? <Badge>{plan}</Badge> : <Badge tone="muted">No active plan</Badge>}
-                      <Badge tone="muted">
-                        {s.count} workout{s.count === 1 ? '' : 's'}
-                      </Badge>
-                      {s.last ? (
-                        <Badge tone="muted">Last: {formatDate(s.last)}</Badge>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-xs text-zinc-600">
-                      Joined {formatDate(user.created_at)}
-                    </p>
-                  </div>
-                </div>
-                <AdminUserActions
-                  userId={user.id}
-                  displayName={user.full_name ?? user.email ?? 'this user'}
-                  isAdmin={user.is_admin}
-                />
-              </Card>
-            )
-          })
-        )}
+      <AdminMembersList members={members} />
+
+      <div className="mt-10">
+        <AdminFeedbackManager feedback={feedback} />
       </div>
 
       <h2 className="mb-3 mt-10 text-lg font-semibold text-zinc-100">All messages</h2>

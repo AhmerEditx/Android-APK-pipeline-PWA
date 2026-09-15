@@ -110,6 +110,15 @@ export type Message = {
   read_at: string | null
 }
 
+export type Feedback = {
+  id: string
+  user_id: string
+  kind: 'bug' | 'suggestion'
+  message: string
+  status: 'new' | 'resolved'
+  created_at: string
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -269,6 +278,19 @@ export interface Database {
           read_at?: string | null
         }
         Update: Partial<Message>
+        Relationships: []
+      }
+      feedback: {
+        Row: Feedback
+        Insert: {
+          id?: string
+          user_id?: string
+          kind: 'bug' | 'suggestion'
+          message: string
+          status?: 'new' | 'resolved'
+          created_at?: string
+        }
+        Update: Partial<Feedback>
         Relationships: []
       }
     }
