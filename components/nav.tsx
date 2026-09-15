@@ -21,6 +21,7 @@ import {
   PlansIcon,
   ProfileIcon,
   TodayIcon,
+  TrophyIcon,
 } from './icons'
 
 const desktopLinks = [
@@ -152,6 +153,7 @@ export function Nav() {
     badge?: number
   }> = [
     { href: '/history', label: 'History', description: 'Past workouts and sessions', icon: HistoryIcon },
+    { href: '/achievements', label: 'Achievements', description: 'Milestones and streak badges', icon: TrophyIcon },
     { href: '/messages', label: 'Messages', description: 'Messages from the app', icon: MessagesIcon, badge: unread },
     { href: '/feedback', label: 'Feedback', description: 'Report a bug, suggest an idea', icon: FeedbackIcon },
     { href: '/profile', label: 'Profile', description: 'Account, stats and settings', icon: ProfileIcon },
