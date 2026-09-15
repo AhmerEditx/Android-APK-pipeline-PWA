@@ -140,7 +140,7 @@ export default async function DashboardPage() {
         <Link href="/messages" className="group">
           <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
             <p className="font-semibold text-zinc-100">Messages</p>
-            <p className="mt-1 text-sm text-zinc-500">Notes from the gym owner.</p>
+            <p className="mt-1 text-sm text-zinc-500">Notes from the app owner.</p>
           </Card>
         </Link>
       </div>

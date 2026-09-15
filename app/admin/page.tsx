@@ -1,8 +1,5 @@
-import { Card, PageHeader } from '@/components/ui'
-import { AdminMembersList, type AdminMember } from '@/components/admin-members-list'
-import { AdminFeedbackManager, type AdminFeedback } from '@/components/admin-feedback-manager'
-import { BroadcastForm } from '@/components/admin-broadcast-form'
-import { AdminMessageManager } from '@/components/admin-message-manager'
+import { PageHeader } from '@/components/ui'
+import { AdminPanel } from '@/components/admin-panel'
 import { createClient, requireAdmin } from '@/lib/supabase/server'
 import { REST, restSchedulePositions, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { daysBetween, localDateISO, weekdayIndex } from '@/lib/utils'
@@ -86,33 +83,7 @@ export default async function AdminPage() {
     stats.set(w.user_id, s)
   }
 
-  const messageRows = (messages ?? []) as unknown as MessageRow[]
   const emailOf = new Map(userRows.map((u) => [u.id, u.email ?? u.full_name ?? 'User']))
-
-  const feedback: AdminFeedback[] = ((feedbackRows ?? []) as unknown as FeedbackRow[]).map(
-    (f) => ({
-      id: f.id,
-      kind: f.kind,
-      message: f.message,
-      status: f.status,
-      created_at: f.created_at,
-      reporter: f.profiles?.full_name ?? f.profiles?.email ?? 'User',
-    })
-  )
-
-  const members: AdminMember[] = userRows.map((user) => {
-    const s = stats.get(user.id) ?? { count: 0, last: null }
-    return {
-      id: user.id,
-      full_name: user.full_name,
-      email: user.email,
-      is_admin: user.is_admin,
-      created_at: user.created_at,
-      plan: planSummary(user.id),
-      workoutCount: s.count,
-      lastWorkout: s.last,
-    }
-  })
 
   function planSummary(userId: string): string | null {
     const p = planMap.get(userId)
@@ -135,27 +106,40 @@ export default async function AdminPage() {
     return `${p.plans.name} · Day ${slot} of ${p.plans.days_count}`
   }
 
+  const messageRowsTyped = (messages ?? []) as unknown as MessageRow[]
+  const feedbackRowsTyped = (feedbackRows ?? []) as unknown as FeedbackRow[]
+
   return (
     <div>
       <PageHeader
         title="Admin panel"
-        description="Owner-only tools: broadcast or message members, reset passwords, and manage access."
+        description="Member management, feedback, and messages — all in one place."
       />
 
-      <h2 className="mb-3 text-lg font-semibold text-zinc-100">Message everyone</h2>
-      <Card className="mb-8 p-5 sm:p-6">
-        <BroadcastForm userIds={userRows.map((u) => u.id)} />
-      </Card>
-
-      <AdminMembersList members={members} />
-
-      <div className="mt-10">
-        <AdminFeedbackManager feedback={feedback} />
-      </div>
-
-      <h2 className="mb-3 mt-10 text-lg font-semibold text-zinc-100">All messages</h2>
-      <AdminMessageManager
-        messages={messageRows.map((msg) => ({
+      <AdminPanel
+        userIds={userRows.map((u) => u.id)}
+        members={userRows.map((user) => {
+          const s = stats.get(user.id) ?? { count: 0, last: null }
+          return {
+            id: user.id,
+            full_name: user.full_name,
+            email: user.email,
+            is_admin: user.is_admin,
+            created_at: user.created_at,
+            plan: planSummary(user.id),
+            workoutCount: s.count,
+            lastWorkout: s.last,
+          }
+        })}
+        feedback={feedbackRowsTyped.map((f) => ({
+          id: f.id,
+          kind: f.kind,
+          message: f.message,
+          status: f.status,
+          created_at: f.created_at,
+          reporter: f.profiles?.full_name ?? f.profiles?.email ?? 'User',
+        }))}
+        messages={messageRowsTyped.map((msg) => ({
           id: msg.id,
           subject: msg.subject,
           body: msg.body,

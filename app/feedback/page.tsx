@@ -18,7 +18,7 @@ export default async function FeedbackPage() {
     <div>
       <PageHeader
         title="Feedback"
-        description="Report a bug or send a suggestion — it goes straight to the gym admin."
+        description="Report a bug or send a suggestion — it goes straight to the app admin."
       />
       <FeedbackForm
         mine={(data ?? []).map((r) => ({

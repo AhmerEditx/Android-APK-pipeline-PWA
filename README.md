@@ -12,7 +12,7 @@ A full-stack gym tracker built with **Next.js 16**, **Supabase** (Postgres + Aut
 - **Body stats** — log weight and optional body-fat %.
 - **Training plans** — pre-made 3/4/5/6/7-day splits (incl. 6-day Push/Pull/Legs/Abs/Upper/Lower); one click starts a program.
 - **"Today" checkbook** — see the prescribed session, tick off sets as you lift, and compare against your last performance.
-- **Admin panel** — only the gym owner sees it. Every member's email, joined date, active plan + current day, workout count and last session; promote/demote admins; message one user **or broadcast to everyone**; reset a member's password.
+- **Admin panel** — only the app owner sees it. Every member's email, joined date, active plan + current day, workout count and last session; promote/demote admins; message one user **or broadcast to everyone**; reset a member's password.
 - **Messages** — members read owner messages in-app with an unread badge in the nav.
 - **Installable (PWA)** — web app manifest, touch/home-screen icons, and a service worker (asset caching + offline page fallback). Android/iOS users can "Add to Home Screen" and run it full-screen like a native app.
 

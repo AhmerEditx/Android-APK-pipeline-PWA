@@ -152,7 +152,7 @@ export function Nav() {
     badge?: number
   }> = [
     { href: '/history', label: 'History', description: 'Past workouts and sessions', icon: HistoryIcon },
-    { href: '/messages', label: 'Messages', description: 'Notes from your gym', icon: MessagesIcon, badge: unread },
+    { href: '/messages', label: 'Messages', description: 'Messages from the app', icon: MessagesIcon, badge: unread },
     { href: '/feedback', label: 'Feedback', description: 'Report a bug, suggest an idea', icon: FeedbackIcon },
     { href: '/profile', label: 'Profile', description: 'Account, stats and settings', icon: ProfileIcon },
     ...(isAdmin ? [{ href: '/admin', label: 'Admin', description: 'Manage members and messages', icon: AdminIcon }] : []),

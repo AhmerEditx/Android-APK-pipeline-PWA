@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     default: 'IronTrack',
     template: '%s · IronTrack',
   },
-  description: 'Track your workouts, sets, reps, and progress in the gym.',
+  description: 'Track your workouts, sets, reps, and progress anywhere.',
   icons: {
     icon: [
       { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },

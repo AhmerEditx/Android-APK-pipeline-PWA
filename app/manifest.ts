@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'IronTrack',
     short_name: 'IronTrack',
-    description: 'Track your workouts, sets, reps, and progress in the gym.',
+    description: 'Track your workouts, sets, reps, and progress anywhere.',
     id: '/',
     start_url: '/',
     display: 'standalone',

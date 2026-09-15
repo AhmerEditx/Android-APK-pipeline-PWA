@@ -32,7 +32,7 @@ export default async function MessagesPage() {
       ) : (
         <EmptyState
           title="No messages yet"
-          description="Messages from the gym owner will show up here."
+          description="Messages from the app owner will show up here."
         />
       )}
     </div>

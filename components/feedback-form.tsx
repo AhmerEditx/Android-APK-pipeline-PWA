@@ -28,7 +28,17 @@ export function FeedbackForm({ mine }: { mine: MyFeedback[] }) {
     setSubmitting(true)
     setError(null)
     const supabase = createClient()
-    const { error } = await supabase.from('feedback').insert({ kind, message: text })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      setError('You need to be signed in to send feedback.')
+      setSubmitting(false)
+      return
+    }
+    const { error } = await supabase
+      .from('feedback')
+      .insert({ kind, message: text, user_id: user.id })
     setSubmitting(false)
     if (error) {
       setError(error.message)

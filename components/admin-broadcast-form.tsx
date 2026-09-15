@@ -55,7 +55,7 @@ export function BroadcastForm({ userIds }: { userIds: string[] }) {
         <Field label={`Subject — goes to all ${userIds.length} members`}>
           <Input
             type="text"
-            placeholder="e.g. Reminder: open gym hours this weekend"
+            placeholder="e.g. Reminder: holiday hours are updated on the site"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
           />
