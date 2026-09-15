@@ -1,6 +1,26 @@
 import { Card } from './ui'
 import type { Achievement } from '@/lib/achievements'
 
+export function AchievementsCompact({ achievements }: { achievements: Achievement[] }) {
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+      {achievements.map((a) => (
+        <div
+          key={a.id}
+          className={`flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-center transition-colors ${
+            a.unlocked
+              ? 'border-lime-400/30 bg-lime-400/5'
+              : 'border-zinc-800/60 bg-zinc-950/60 opacity-50 saturate-0'
+          }`}
+        >
+          <span className="text-2xl">{a.icon}</span>
+          <span className="text-[11px] font-medium leading-tight text-zinc-300">{a.title}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function AchievementsGrid({ achievements }: { achievements: Achievement[] }) {
   const unlocked = achievements.filter((a) => a.unlocked).length
 

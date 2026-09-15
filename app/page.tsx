@@ -3,6 +3,8 @@ import { createClient, requireUser } from '@/lib/supabase/server'
 import { formatDate, formatNumber, computeWorkoutStreaks, startOfWeek } from '@/lib/utils'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui'
 import { DeleteWorkoutButton } from '@/components/delete-workout-button'
+import { AchievementsCompact } from '@/components/achievements-grid'
+import { getAchievements } from '@/lib/achievements'
 
 type WorkoutVolumeRow = {
   id: string
@@ -100,6 +102,7 @@ export default async function DashboardPage() {
   const currentWeight = measurements?.[measurements.length - 1]?.weight_kg ?? null
   const firstName = profile?.full_name?.split(' ')[0] ?? (user.email ? user.email.split('@')[0] : 'Athlete')
   const streaks = computeWorkoutStreaks((allDateRows ?? []).map((r) => r.date))
+  const achievements = getAchievements(totalWorkouts ?? 0, streaks.longest)
 
   const recentRows = (recent ?? []) as unknown as RecentRow[]
 
@@ -173,6 +176,16 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-zinc-500">Notes from the app owner.</p>
           </Card>
         </Link>
+      </div>
+
+      <div className="mt-10">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-zinc-100">Achievements</h2>
+          <Link href="/achievements" className="text-sm font-medium text-lime-400 hover:text-lime-300">
+            View all
+          </Link>
+        </div>
+        <AchievementsCompact achievements={achievements} />
       </div>
 
       <div className="mt-10">
