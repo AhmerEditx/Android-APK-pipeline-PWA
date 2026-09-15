@@ -37,7 +37,6 @@ type FeedbackRow = {
   message: string
   status: 'new' | 'resolved'
   created_at: string
-  profiles: { full_name: string | null; email: string | null } | null
 }
 
 export const metadata = { title: 'Admin' }
@@ -60,7 +59,7 @@ export default async function AdminPage() {
       supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50),
       supabase
         .from('feedback')
-        .select('id, user_id, kind, message, status, created_at, profiles(full_name, email)')
+        .select('id, user_id, kind, message, status, created_at')
         .order('created_at', { ascending: false })
         .limit(100),
     ])
@@ -137,7 +136,7 @@ export default async function AdminPage() {
           message: f.message,
           status: f.status,
           created_at: f.created_at,
-          reporter: f.profiles?.full_name ?? f.profiles?.email ?? 'User',
+          reporter: emailOf.get(f.user_id) ?? 'User',
         }))}
         messages={messageRowsTyped.map((msg) => ({
           id: msg.id,
