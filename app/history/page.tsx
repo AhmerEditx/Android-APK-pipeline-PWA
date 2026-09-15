@@ -1,5 +1,7 @@
 import Link from 'next/link'
 import { Badge, Card, EmptyState, PageHeader } from '@/components/ui'
+import { DeleteWorkoutButton } from '@/components/delete-workout-button'
+import { ClearHistoryButton } from '@/components/clear-history-button'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import { formatDate, formatNumber } from '@/lib/utils'
 
@@ -28,7 +30,13 @@ export default async function HistoryPage() {
 
   return (
     <div>
-      <PageHeader title="Workout history" description="Every session you've logged." />
+      <PageHeader
+        title="Workout history"
+        description="Every session you've logged."
+        action={
+          rows.length > 0 ? <ClearHistoryButton /> : undefined
+        }
+      />
 
       {rows.length === 0 ? (
         <EmptyState
@@ -56,23 +64,24 @@ export default async function HistoryPage() {
               0
             )
             return (
-              <Link key={w.id} href={`/history/${w.id}`} className="group block">
-                <Card className="flex flex-wrap items-center justify-between gap-3 p-4 transition-colors group-hover:border-zinc-700">
-                  <div>
+              <Card key={w.id} className="p-4 transition-colors group-hover:border-zinc-700">
+                <div className="flex items-center justify-between gap-3">
+                  <Link href={`/history/${w.id}`} className="group min-w-0 flex-1">
                     <p className="font-semibold text-zinc-100">{formatDate(w.date)}</p>
                     {w.notes ? (
                       <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500">{w.notes}</p>
                     ) : (
                       <p className="mt-0.5 text-xs text-zinc-600">No notes</p>
                     )}
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tone="accent">{exerciseCount} exercises</Badge>
-                    <Badge>{setCount} sets</Badge>
-                    <Badge tone="muted">{formatNumber(volume)} kg</Badge>
-                  </div>
-                </Card>
-              </Link>
+                  </Link>
+                  <DeleteWorkoutButton workoutId={w.id} />
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                  <Badge tone="accent">{exerciseCount} exercises</Badge>
+                  <Badge>{setCount} sets</Badge>
+                  <Badge tone="muted">{formatNumber(volume)} kg</Badge>
+                </div>
+              </Card>
             )
           })}
         </div>

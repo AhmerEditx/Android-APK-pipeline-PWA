@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import { formatDate, formatNumber, startOfWeek } from '@/lib/utils'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui'
+import { DeleteWorkoutButton } from '@/components/delete-workout-button'
 
 type WorkoutVolumeRow = {
   id: string
@@ -165,22 +166,25 @@ export default async function DashboardPage() {
                 .map((we) => we.exercises?.name)
                 .filter((n): n is string => Boolean(n))
               return (
-                <Link key={w.id} href={`/history/${w.id}`} className="group">
-                  <Card className="h-full p-4 transition-colors group-hover:border-zinc-700">
+                <Card key={w.id} className="h-full p-4 transition-colors group-hover:border-zinc-700">
+                <div className="flex items-start justify-between gap-3">
+                  <Link href={`/history/${w.id}`} className="group min-w-0 flex-1">
                     <p className="text-sm font-semibold text-zinc-100">{formatDate(w.date)}</p>
                     {w.notes ? (
                       <p className="mt-1 line-clamp-1 text-xs text-zinc-500">{w.notes}</p>
                     ) : null}
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <Badge tone="accent">{names.length} exercises</Badge>
-                      {names.slice(0, 2).map((name) => (
-                        <Badge key={name} tone="muted">
-                          {name}
-                        </Badge>
-                      ))}
-                    </div>
-                  </Card>
-                </Link>
+                  </Link>
+                  <DeleteWorkoutButton workoutId={w.id} />
+                </div>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  <Badge tone="accent">{names.length} exercises</Badge>
+                  {names.slice(0, 2).map((name) => (
+                    <Badge key={name} tone="muted">
+                      {name}
+                    </Badge>
+                  ))}
+                </div>
+              </Card>
               )
             })}
           </div>

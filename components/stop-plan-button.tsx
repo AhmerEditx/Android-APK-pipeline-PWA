@@ -5,7 +5,13 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui'
 
-export function StopPlanButton({ userPlanId }: { userPlanId: string }) {
+export function StopPlanButton({
+  userPlanId,
+  compact = false,
+}: {
+  userPlanId: string
+  compact?: boolean
+}) {
   const router = useRouter()
   const [stopping, setStopping] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +40,17 @@ export function StopPlanButton({ userPlanId }: { userPlanId: string }) {
       setError(err instanceof Error ? err.message : 'Could not stop plan.')
       setStopping(false)
     }
+  }
+
+  if (compact) {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <Button variant="secondary" size="sm" onClick={handleStop} disabled={stopping}>
+          {stopping ? 'Stopping…' : 'Stop this plan'}
+        </Button>
+        {error ? <p className="text-xs text-red-400">{error}</p> : null}
+      </div>
+    )
   }
 
   return (

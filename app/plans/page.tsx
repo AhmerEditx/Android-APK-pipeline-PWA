@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Badge, Card, LinkButton, PageHeader } from '@/components/ui'
 import { createClient, requireUser } from '@/lib/supabase/server'
 import type { Plan } from '@/lib/supabase/types'
+import { StopPlanButton } from '@/components/stop-plan-button'
 
 type PlanRow = Plan & {
   plan_days: Array<{ plan_day_exercises: Array<{ id: string }>; name: string }>
@@ -21,7 +22,7 @@ export default async function PlansPage() {
       .order('days_count'),
     supabase
       .from('user_plans')
-      .select('plan_id')
+      .select('id, plan_id')
       .eq('user_id', user.id)
       .eq('active', true)
       .maybeSingle(),
@@ -35,9 +36,12 @@ export default async function PlansPage() {
         title="Training plans"
         description="Pick a weekly split, start it, and check off each day from the Today page."
         action={
-          <LinkButton href="/plans/new" variant="primary">
-            + Create plan
-          </LinkButton>
+          <div className="flex flex-wrap items-center gap-2">
+            {activePlan ? <StopPlanButton userPlanId={activePlan.id} compact /> : null}
+            <LinkButton href="/plans/new" variant="primary">
+              + Create plan
+            </LinkButton>
+          </div>
         }
       />
 

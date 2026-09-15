@@ -4,6 +4,7 @@ import { TodayChecklist } from '@/components/today-checklist'
 import type { TodaysExercises } from '@/components/today-checklist'
 import { TodayExerciseEditor } from '@/components/today-exercise-editor'
 import type { CatalogExercise } from '@/components/plan-exercises-editor'
+import { StopPlanButton } from '@/components/stop-plan-button'
 import {
   effectiveExercisesForDay,
   type TemplatePlanDay,
@@ -161,6 +162,7 @@ export default async function TodayPage() {
         <PageHeader
           title="Rest day"
           description={`${row.plans.name} · recover before the next session.`}
+          action={<StopPlanButton userPlanId={row.id} compact />}
         />
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 sm:p-8">
           <div className="flex items-center gap-2">
@@ -186,7 +188,7 @@ export default async function TodayPage() {
   if (slot.kind === 'custom') {
     return (
       <div>
-        <PageHeader title="Today's workout" description={`${row.plans.name} · ${slot.name}`} />
+        <PageHeader title="Today's workout" description={`${row.plans.name} · ${slot.name}`} action={<StopPlanButton userPlanId={row.id} compact />} />
         <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 sm:p-8">
           <div className="flex items-center gap-2">
             <Badge tone="accent">{slot.name}</Badge>
@@ -266,6 +268,7 @@ export default async function TodayPage() {
           <div className="flex items-center gap-2">
             <Badge tone="accent">{day.name}</Badge>
             <Badge>{setsToday} sets</Badge>
+            <StopPlanButton userPlanId={row.id} compact />
           </div>
         }
       />

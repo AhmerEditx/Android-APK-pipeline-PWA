@@ -11,6 +11,7 @@ import {
   AdminIcon,
   BackIcon,
   ChartIcon,
+  ChevronIcon,
   CloseIcon,
   HistoryIcon,
   HomeIcon,
@@ -44,6 +45,8 @@ export function Nav() {
   const [ready, setReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [profileName, setProfileName] = useState<string | null>(null)
+  const [profileEmail, setProfileEmail] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
   const [prevPathname, setPrevPathname] = useState(pathname)
   const [canBack, setCanBack] = useState(false)
@@ -109,7 +112,7 @@ export function Nav() {
       const [{ data: profile }, { count }] = await Promise.all([
         supabase
           .from('profiles')
-          .select('is_admin')
+          .select('is_admin, full_name, email')
           .eq('id', user.id)
           .maybeSingle(),
         supabase
@@ -120,6 +123,8 @@ export function Nav() {
       ])
       if (cancelled) return
       setIsAdmin(Boolean(profile?.is_admin))
+      setProfileName(profile?.full_name ?? null)
+      setProfileEmail(profile?.email ?? null)
       setUnread(count ?? 0)
     })
     return () => {
@@ -141,17 +146,24 @@ export function Nav() {
   const sheetLinks: Array<{
     href: string
     label: string
+    description: string
     icon: ComponentType<{ className?: string }>
     badge?: number
   }> = [
-    { href: '/plans', label: 'Plans', icon: PlansIcon },
-    { href: '/history', label: 'History', icon: HistoryIcon },
-    { href: '/messages', label: 'Messages', icon: MessagesIcon, badge: unread },
-    { href: '/profile', label: 'Profile', icon: ProfileIcon },
-    ...(isAdmin ? [{ href: '/admin', label: 'Admin', icon: AdminIcon }] : []),
+    { href: '/history', label: 'History', description: 'Past workouts and sessions', icon: HistoryIcon },
+    { href: '/messages', label: 'Messages', description: 'Notes from your gym', icon: MessagesIcon, badge: unread },
+    { href: '/profile', label: 'Profile', description: 'Account, stats and settings', icon: ProfileIcon },
+    ...(isAdmin ? [{ href: '/admin', label: 'Admin', description: 'Manage members and messages', icon: AdminIcon }] : []),
   ]
 
   const showNav = ready && !isAuthPage && authed
+
+  const accountName = profileName?.trim() || profileEmail?.split('@')[0] || 'Athlete'
+  const initials = accountName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
 
   return (
     <>
@@ -281,12 +293,12 @@ export function Nav() {
                 onClick={() => setMoreOpen(false)}
               />
               <div
-                className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-zinc-800 bg-zinc-900 p-3"
+                className="absolute inset-x-0 bottom-0 overflow-hidden rounded-t-3xl border-t border-zinc-800 bg-zinc-900 p-3"
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
               >
-                <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-zinc-700" />
-                <div className="mb-2 flex items-center justify-between px-1">
-                  <span className="text-sm font-semibold text-zinc-300">More</span>
+                <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-700" />
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <span className="text-base font-bold text-zinc-100">More</span>
                   <button
                     type="button"
                     onClick={() => setMoreOpen(false)}
@@ -296,7 +308,27 @@ export function Nav() {
                     <CloseIcon className="h-5 w-5" />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 gap-1">
+
+                <Link
+                  href="/profile"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 rounded-2xl border border-zinc-800 bg-zinc-950/60 p-3 transition-colors hover:bg-zinc-800/60"
+                >
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-lime-400 to-emerald-500 text-lg font-black text-zinc-950 shadow-lg shadow-lime-500/10">
+                    {initials || 'I'}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-bold text-zinc-50">
+                      {accountName}
+                    </span>
+                    <span className="block truncate text-xs text-zinc-500">
+                      {profileEmail ?? 'Manage your profile'}
+                    </span>
+                  </span>
+                  <ChevronIcon className="h-5 w-5 shrink-0 text-zinc-600" />
+                </Link>
+
+                <div className="mt-2 grid gap-2">
                   {sheetLinks.map((link) => {
                     const Icon = link.icon
                     const active = isActive(link.href)
@@ -305,25 +337,42 @@ export function Nav() {
                         key={link.href}
                         href={link.href}
                         onClick={() => setMoreOpen(false)}
-                        className={`relative flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium ${
+                        className={`group flex items-center gap-3 rounded-2xl border px-3 py-3 transition-colors ${
                           active
-                            ? 'bg-zinc-800 text-lime-400'
-                            : 'text-zinc-300 hover:bg-zinc-800/60'
+                            ? 'border-lime-400/30 bg-lime-400/5'
+                            : 'border-transparent bg-zinc-950/60 hover:border-zinc-800 hover:bg-zinc-800/60'
                         }`}
                       >
-                        <Icon className="h-5 w-5" />
-                        {link.label}
+                        <span
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                            active
+                              ? 'bg-lime-400/15 text-lime-300'
+                              : 'bg-zinc-800 text-zinc-300 group-hover:bg-zinc-700 group-hover:text-zinc-100'
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-zinc-100">
+                            {link.label}
+                          </span>
+                          <span className="block truncate text-xs text-zinc-500">
+                            {link.description}
+                          </span>
+                        </span>
                         {link.badge ? (
-                          <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-bold text-zinc-950">
+                          <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-lime-400 px-1 text-[11px] font-bold text-zinc-950">
                             {link.badge}
                           </span>
                         ) : null}
+                        <ChevronIcon className="h-4 w-4 shrink-0 text-zinc-600 transition-colors group-hover:text-zinc-400" />
                       </Link>
                     )
                   })}
                 </div>
+
                 <div className="mt-2 border-t border-zinc-800 pt-2">
-                  <LogoutButton />
+                  <LogoutButton asSheetRow />
                 </div>
               </div>
             </div>
