@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient, requireUser } from '@/lib/supabase/server'
-import { formatDate, formatNumber, startOfWeek } from '@/lib/utils'
+import { formatDate, formatNumber, computeWorkoutStreaks, startOfWeek } from '@/lib/utils'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui'
 import { DeleteWorkoutButton } from '@/components/delete-workout-button'
 
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
   const user = await requireUser()
 
   const weekStart = startOfWeek()
-  const [{ data: profile }, { count: totalWorkouts }, { count: workoutsThisWeek }, { data: recent }, { data: measurements }, { volume }] =
+  const [{ data: profile }, { count: totalWorkouts }, { count: workoutsThisWeek }, { data: recent }, { data: measurements }, { volume }, { data: allDateRows }] =
     await Promise.all([
       supabase
         .from('profiles')
@@ -89,11 +89,17 @@ export default async function DashboardPage() {
         .select('measured_on, weight_kg')
         .order('measured_on', { ascending: true }),
       fetchTotalVolume(supabase),
+      supabase
+        .from('workouts')
+        .select('date')
+        .order('date', { ascending: false })
+        .limit(500),
     ])
 
   const totalVolume = volume
   const currentWeight = measurements?.[measurements.length - 1]?.weight_kg ?? null
   const firstName = profile?.full_name?.split(' ')[0] ?? (user.email ? user.email.split('@')[0] : 'Athlete')
+  const streaks = computeWorkoutStreaks((allDateRows ?? []).map((r) => r.date))
 
   const recentRows = (recent ?? []) as unknown as RecentRow[]
 
@@ -108,6 +114,30 @@ export default async function DashboardPage() {
           </LinkButton>
         }
       />
+
+      <Card className="mb-4 p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🔥</span>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Streak</p>
+              <p className="text-2xl font-bold text-zinc-50">
+                {streaks.current} day{streaks.current === 1 ? '' : 's'}
+              </p>
+              <p className="text-xs text-zinc-500">
+                {streaks.current === 0 ? 'Log a workout to start one' : 'Keep it going!'}
+              </p>
+            </div>
+          </div>
+          <div className="border-l border-zinc-800 pl-6">
+            <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Best</p>
+            <p className="text-2xl font-bold text-zinc-50">
+              {streaks.longest} day{streaks.longest === 1 ? '' : 's'}
+            </p>
+            <p className="text-xs text-zinc-500">Personal record</p>
+          </div>
+        </div>
+      </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Workouts logged" value={String(totalWorkouts)} />

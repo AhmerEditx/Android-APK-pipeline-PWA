@@ -47,3 +47,38 @@ export function addDays(iso: string, days: number): string {
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().slice(0, 10)
 }
+
+export function computeWorkoutStreaks(dates: string[]): {
+  current: number
+  longest: number
+} {
+  const unique = [...new Set(dates)].sort()
+  if (unique.length === 0) return { current: 0, longest: 0 }
+
+  let longest = 1
+  let streak = 1
+  for (let i = 1; i < unique.length; i++) {
+    if (addDays(unique[i], -1) === unique[i - 1]) {
+      streak++
+    } else {
+      if (streak > longest) longest = streak
+      streak = 1
+    }
+  }
+  if (streak > longest) longest = streak
+
+  const today = localDateISO()
+  const dateSet = new Set(unique)
+  let current = 0
+  let d = today
+  if (!dateSet.has(d)) {
+    const y = addDays(today, -1)
+    if (dateSet.has(y)) d = y
+  }
+  while (dateSet.has(d)) {
+    current++
+    d = addDays(d, -1)
+  }
+
+  return { current, longest }
+}
