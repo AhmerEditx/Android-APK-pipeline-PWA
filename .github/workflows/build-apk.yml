@@ -95,8 +95,30 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: IronTrack ${{ steps.version.outputs.tag }}
           body: |
+            ## IronTrack
+
+            A clean, no-nonsense gym tracker built for people who just want to log lifts, track progress, and stay consistent.
+
+            **What's included:**
+            - Workout logging with sets, reps, weight, and warm-up flags
+            - Training plans (3–7 day splits, Push/Pull/Legs, custom plans)
+            - Progress charts — body weight, volume, and per-exercise trends
+            - Workout streaks and achievement badges
+            - Today tab with live set-by-set performance comparison
+            - Admin panel for managing members and messages
+            - Installable as a PWA or Android app — no ads, no tracking
+
+            **How to install:**
+            1. Download `app-release.apk` below
+            2. Open it on your Android phone
+            3. If prompted, enable **Install unknown apps** for your browser
+            4. Tap Install — done
+
+            **Built with:** Next.js, Supabase, Tailwind CSS, Capacitor
+            **Web app:** https://android-apk-pipeline-pwa.vercel.app
+
+            ---
             Auto-built from commit ${{ github.sha }}.
-            Install: download the APK → Settings → Install unknown apps → open it.
           files: |
             android/app/build/outputs/apk/debug/app-debug.apk
             android/app/build/outputs/apk/release/app-release.apk
