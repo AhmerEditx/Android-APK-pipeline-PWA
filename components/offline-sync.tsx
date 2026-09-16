@@ -76,7 +76,17 @@ export function OfflineSync() {
     syncingRef.current = true
 
     const supabase = createClient()
-    const { data: auth } = await supabase.auth.getUser()
+    let auth: { user: { id: string } | null }
+    try {
+      const res = await supabase.auth.getUser()
+      auth = { user: res.data?.user ?? null }
+    } catch (err) {
+      if (isNetworkError(err)) {
+        syncingRef.current = false
+        return
+      }
+      throw err
+    }
     if (!auth.user) {
       syncingRef.current = false
       return
@@ -98,6 +108,33 @@ export function OfflineSync() {
 
     syncingRef.current = false
     setSyncing(false)
+  }, [])
+
+  useEffect(() => {
+    // Offline: force internal <Link> clicks to full page loads so the service
+    // worker can serve cached HTML. Client-side (RSC) navigation needs the
+    // network, so it would silently fail without this.
+    function onClickCapture(e: MouseEvent) {
+      if (e.defaultPrevented) return
+      if (e.button !== 0) return
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+      const element = e.target
+      if (!(element instanceof Element)) return
+      const anchor = element.closest('a')
+      if (!anchor) return
+      if (anchor.target && anchor.target !== '_self') return
+      const href = anchor.getAttribute('href')
+      if (!href || href.startsWith('#')) return
+      const url = new URL(href, window.location.href)
+      if (url.origin !== window.location.origin) return
+      if (isOnline()) return
+      e.preventDefault()
+      e.stopPropagation()
+      window.location.assign(url.href)
+    }
+
+    document.addEventListener('click', onClickCapture, true)
+    return () => document.removeEventListener('click', onClickCapture, true)
   }, [])
 
   useEffect(() => {
@@ -133,16 +170,20 @@ export function OfflineSync() {
     }
   }, [syncNow])
 
-  if (!online && pending > 0) {
-    return (
-      <div className="fixed inset-x-0 bottom-16 z-40 mx-auto max-w-md px-4">
-        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-950/90 px-4 py-3 text-sm text-amber-200 shadow-lg backdrop-blur">
-          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-400" />
-          <span>Offline — {pending} workout{pending === 1 ? '' : 's'} stored locally. Will sync when you reconnect.</span>
-        </div>
+if (!online) {
+  return (
+    <div className="fixed inset-x-0 bottom-16 z-40 mx-auto max-w-md px-4">
+      <div className="flex items-center gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-950/90 px-4 py-3 text-sm text-amber-200 shadow-lg backdrop-blur">
+        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-400" />
+        <span>
+          {pending > 0
+            ? `Offline — ${pending} workout${pending === 1 ? '' : 's'} stored locally. Will sync when you reconnect.`
+            : 'Offline — showing saved copy. Workouts you log will sync when you reconnect.'}
+        </span>
       </div>
-    )
-  }
+    </div>
+  )
+}
 
   if (online && pending > 0) {
     return (
