@@ -6,6 +6,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
 import type { Database, Exercise } from '@/lib/supabase/types'
 import { Badge, Button, Card, Field, Input } from '@/components/ui'
+import {
+  addPendingWorkout,
+  generateId,
+  isNetworkError,
+  isOnline,
+  type OfflineWorkout,
+} from '@/lib/offline'
 
 type DraftSet = {
   dbId: string | null
@@ -52,6 +59,33 @@ function toNumber(raw: string): number | null {
   if (trimmed === '') return null
   const n = Number(trimmed)
   return Number.isNaN(n) ? null : n
+}
+
+function buildOfflineWorkout(
+  date: string,
+  notes: string,
+  drafts: DraftExercise[]
+): OfflineWorkout {
+  return {
+    workoutId: generateId(),
+    date,
+    notes: notes.trim() || null,
+    plan_day_id: null,
+    exercises: drafts.map((d, i) => {
+      const sets: OfflineWorkout['exercises'][number]['sets'] = []
+      let setNumber = 1
+      for (const s of d.sets) {
+        sets.push({
+          set_number: setNumber++,
+          weight_kg: toNumber(s.weight),
+          reps: toNumber(s.reps),
+          is_warmup: s.is_warmup,
+        })
+      }
+      return { weId: generateId(), exercise_id: d.exercise.id, position: i, sets }
+    }),
+    queuedAt: new Date().toISOString(),
+  }
 }
 
 async function syncSets(
@@ -109,6 +143,7 @@ export function WorkoutForm({ exercises, initial }: { exercises: Exercise[]; ini
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [savedOffline, setSavedOffline] = useState(false)
 
   const muscleGroups = useMemo(
     () => Array.from(new Set(exercises.map((e) => e.muscle_group))).sort(),
@@ -175,6 +210,14 @@ export function WorkoutForm({ exercises, initial }: { exercises: Exercise[]; ini
 
     setSaving(true)
     setError(null)
+
+    if (!isEdit && !isOnline()) {
+      addPendingWorkout(buildOfflineWorkout(date, notes, added))
+      setSavedOffline(true)
+      setSaving(false)
+      return
+    }
+
     const supabase = createClient()
 
     try {
@@ -264,12 +307,35 @@ export function WorkoutForm({ exercises, initial }: { exercises: Exercise[]; ini
       router.push(`/history/${workoutId}`)
       router.refresh()
     } catch (err) {
+      if (!isEdit && isNetworkError(err)) {
+        addPendingWorkout(buildOfflineWorkout(date, notes, added))
+        setSavedOffline(true)
+        setSaving(false)
+        return
+      }
       setError(err instanceof Error ? err.message : 'Something went wrong saving the workout.')
       setSaving(false)
     }
   }
 
   const gridCols = 'grid grid-cols-[2.25rem_1fr_4.5rem_4.5rem_2rem] items-center gap-2 sm:grid-cols-[3rem_1fr_6rem_6rem_2.5rem]'
+
+  if (savedOffline) {
+    return (
+      <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+        <p className="text-lg font-semibold text-zinc-200">Workout saved offline 📥</p>
+        <p className="max-w-sm text-sm text-zinc-500">
+          You are offline, so this workout has been stored on your device. It will sync to
+          your account automatically when you reconnect.
+        </p>
+        <div className="mt-2">
+          <Button variant="ghost" onClick={() => router.push('/')}>
+            Back to dashboard
+          </Button>
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <form onSubmit={handleSave} className="space-y-8">

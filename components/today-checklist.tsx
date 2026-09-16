@@ -5,6 +5,13 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Badge, Button, Card, Field, Input } from '@/components/ui'
 import { formatDate, formatNumber } from '@/lib/utils'
+import {
+  addPendingWorkout,
+  generateId,
+  isNetworkError,
+  isOnline,
+  type OfflineWorkout,
+} from '@/lib/offline'
 
 export type TodaysExercises = Array<{
   pdeId: string
@@ -40,6 +47,32 @@ function toNumber(raw: string): number | null {
 function seedSets(sets: number): DraftSet[] {
   const count = Math.max(sets, 1)
   return Array.from({ length: count }, () => ({ done: false, weight: '', reps: '' }))
+}
+
+function buildOfflineWorkout(
+  date: string,
+  notes: string,
+  planDayId: string | null,
+  exercisesToSave: DraftExercise[]
+): OfflineWorkout {
+  return {
+    workoutId: generateId(),
+    date,
+    notes: notes.trim() || null,
+    plan_day_id: planDayId,
+    exercises: exercisesToSave.map((ex, i) => {
+      const sets: OfflineWorkout['exercises'][number]['sets'] = []
+      let setNumber = 1
+      for (const s of ex.sets) {
+        const weight = toNumber(s.weight)
+        const reps = toNumber(s.reps)
+        if (weight == null && reps == null) continue
+        sets.push({ set_number: setNumber++, weight_kg: weight, reps })
+      }
+      return { weId: generateId(), exercise_id: ex.exerciseId, position: i, sets }
+    }),
+    queuedAt: new Date().toISOString(),
+  }
 }
 
 function SetProgress({
@@ -131,6 +164,7 @@ export function TodayChecklist({
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
+  const [savedOffline, setSavedOffline] = useState(false)
 
   function updateSet(
     exIndex: number,
@@ -175,6 +209,15 @@ export function TodayChecklist({
 
     setSaving(true)
     setError(null)
+
+    const offlinePayload = buildOfflineWorkout(date, notes, planDayId, exercisesToSave)
+
+    if (!isOnline()) {
+      addPendingWorkout(offlinePayload)
+      setSavedOffline(true)
+      setSaving(false)
+      return
+    }
 
     try {
       const { data, error: workoutErr } = await supabase
@@ -228,9 +271,32 @@ export function TodayChecklist({
       setSavedId(workoutId)
       router.refresh()
     } catch (err) {
+      if (isNetworkError(err)) {
+        addPendingWorkout(offlinePayload)
+        setSavedOffline(true)
+        setSaving(false)
+        return
+      }
       setError(err instanceof Error ? err.message : 'Could not save workout.')
       setSaving(false)
     }
+  }
+
+  if (savedOffline) {
+    return (
+      <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+        <p className="text-lg font-semibold text-zinc-200">Workout saved offline 📥</p>
+        <p className="max-w-sm text-sm text-zinc-500">
+          You are offline, so this workout has been stored on your device. It will sync to
+          your account automatically when you reconnect.
+        </p>
+        <div className="mt-2 flex items-center gap-2">
+          <Button variant="ghost" onClick={() => router.push('/today')}>
+            Back to today
+          </Button>
+        </div>
+      </Card>
+    )
   }
 
   if (savedId) {

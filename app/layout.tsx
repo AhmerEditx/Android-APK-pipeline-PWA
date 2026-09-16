@@ -5,6 +5,7 @@ import './globals.css'
 import { Nav } from '@/components/nav'
 import { AppBridge } from '@/components/app-bridge'
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
+import { OfflineSync } from '@/components/offline-sync'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
       <body className="flex min-h-full flex-col bg-zinc-950 text-zinc-100" suppressHydrationWarning>
         <ServiceWorkerRegistration />
         <AppBridge />
+        <OfflineSync />
         <Nav />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 pb-24 sm:px-6 lg:pb-8">{children}</main>
         <footer className="hidden border-t border-zinc-800/80 pt-6 pb-10 lg:block">
