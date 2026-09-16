@@ -59,7 +59,7 @@ const inputBase =
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   const { className = '', ...rest } = props
-  return <input className={`${inputBase} ${className}`} {...rest} />
+  return <input className={`${inputBase} ${className}`} suppressHydrationWarning {...rest} />
 }
 
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
