@@ -92,6 +92,7 @@ export default async function TodayPage() {
     { data: userExData },
     { data: lastAttempts },
     { data: catalogData },
+    { data: todayWorkout },
   ] = await Promise.all([
     supabase
       .from('plan_days')
@@ -113,6 +114,12 @@ export default async function TodayPage() {
       .order('date', { ascending: false })
       .limit(30),
     supabase.from('exercises').select('id, name, muscle_group, equipment, primary_muscle').order('name'),
+    supabase
+      .from('workouts')
+      .select('id, date')
+      .eq('user_id', user.id)
+      .eq('date', today)
+      .maybeSingle(),
   ])
 
   const planDayRows = (planDaysData ?? []) as unknown as PlanDayRow[]
@@ -258,6 +265,44 @@ export default async function TodayPage() {
   })
 
   const setsToday = todaysExercises.reduce((sum, ex) => sum + ex.prescribedSets, 0)
+
+  const doneToday = (todayWorkout ?? null) as unknown as { id: string; date: string } | null
+
+  if (doneToday) {
+    return (
+      <div>
+        <PageHeader
+          title="Today's workout"
+          description={`${row.plans.name} · ${day.name}`}
+          action={<Badge tone="accent">Completed</Badge>}
+        />
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-6 text-center sm:p-8">
+          <Badge tone="accent">Session complete</Badge>
+          <h2 className="mt-4 text-xl font-bold text-zinc-50">
+            Day {day.position} · {day.name} is done for today.
+          </h2>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-zinc-500">
+            Nice work. You have already logged today&apos;s session — come back
+            tomorrow for the next one.
+          </p>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+            <Link
+              href={`/history/${doneToday.id}`}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-lime-400 px-4 py-2 text-sm font-semibold text-zinc-950 transition-colors hover:bg-lime-300"
+            >
+              View workout
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-zinc-700 px-4 py-2 text-sm font-semibold text-zinc-200 transition-colors hover:bg-zinc-800"
+            >
+              Back to dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
