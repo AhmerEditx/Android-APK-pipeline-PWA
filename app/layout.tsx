@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import Link from 'next/link'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Nav } from '@/components/nav'
@@ -52,6 +53,19 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         <AppBridge />
         <Nav />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 pb-24 sm:px-6 lg:pb-8">{children}</main>
+        <footer className="hidden border-t border-zinc-800/80 pt-6 pb-10 lg:block">
+          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-6 text-sm text-zinc-600">
+            <span>© {new Date().getFullYear()} IronTrack</span>
+            <nav className="flex items-center gap-6">
+              <Link href="/about" className="transition-colors hover:text-zinc-300">
+                About
+              </Link>
+              <Link href="/feedback" className="transition-colors hover:text-zinc-300">
+                Feedback
+              </Link>
+            </nav>
+          </div>
+        </footer>
       </body>
     </html>
   )

@@ -31,6 +31,7 @@ const desktopLinks = [
   { href: '/plans', label: 'Plans' },
   { href: '/history', label: 'History' },
   { href: '/progress', label: 'Progress' },
+  { href: '/achievements', label: 'Achievements' },
   { href: '/profile', label: 'Profile' },
 ]
 
