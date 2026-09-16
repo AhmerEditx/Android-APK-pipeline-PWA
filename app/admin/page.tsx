@@ -45,24 +45,33 @@ export default async function AdminPage() {
   const supabase = await createClient()
   await requireAdmin()
 
-  const [{ data: users }, { data: planRows }, { data: workoutRows }, { data: messages }, { data: feedbackRows }] =
-    await Promise.all([
-      supabase
-        .from('profiles')
-        .select('id, full_name, email, is_admin, created_at')
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('user_plans')
-        .select('user_id, starts_on, schedule, plans(name, days_count)')
-        .eq('active', true),
-      supabase.from('workouts').select('user_id, date').order('date', { ascending: false }),
-      supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50),
-      supabase
-        .from('feedback')
-        .select('id, user_id, kind, message, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(100),
-    ])
+  const [
+    { data: users },
+    { data: planRows },
+    { data: workoutRows },
+    { data: messages },
+    { data: feedbackRows },
+    { count: setCount },
+    { count: measurementCount },
+  ] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('id, full_name, email, is_admin, created_at')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('user_plans')
+      .select('user_id, starts_on, schedule, plans(name, days_count)')
+      .eq('active', true),
+    supabase.from('workouts').select('user_id, date').order('date', { ascending: false }),
+    supabase.from('messages').select('*').order('created_at', { ascending: false }).limit(50),
+    supabase
+      .from('feedback')
+      .select('id, user_id, kind, message, status, created_at')
+      .order('created_at', { ascending: false })
+      .limit(100),
+    supabase.from('sets').select('id', { count: 'exact', head: true }),
+    supabase.from('body_measurements').select('id', { count: 'exact', head: true }),
+  ])
 
   const userRows = (users ?? []) as unknown as UserRow[]
   const planMap = new Map(
@@ -73,6 +82,19 @@ export default async function AdminPage() {
   )
   const workoutRowsTyped = (workoutRows ?? []) as unknown as WorkoutRow[]
   const today = localDateISO()
+
+  const monthPrefix = today.slice(0, 7)
+  const activeThisMonth = new Set(
+    workoutRowsTyped.filter((w) => w.date.startsWith(monthPrefix)).map((w) => w.user_id)
+  ).size
+
+  const usage = {
+    registeredUsers: userRows.length,
+    activeThisMonth,
+    totalWorkouts: workoutRowsTyped.length,
+    totalSets: setCount ?? 0,
+    totalMeasurements: measurementCount ?? 0,
+  }
 
   const stats = new Map<string, { count: number; last: string | null }>()
   for (const w of workoutRowsTyped) {
@@ -116,6 +138,7 @@ export default async function AdminPage() {
       />
 
       <AdminPanel
+        usage={usage}
         userIds={userRows.map((u) => u.id)}
         members={userRows.map((user) => {
           const s = stats.get(user.id) ?? { count: 0, last: null }
