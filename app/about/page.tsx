@@ -14,8 +14,7 @@ export default function AboutPage() {
       <Card className="overflow-hidden border-0 bg-gradient-to-br from-zinc-900 via-zinc-900 to-lime-950/60 p-5 sm:p-6">
         <h2 className="text-lg font-bold text-zinc-50">About the developer</h2>
         <div className="mt-3">
-          <p className="font-semibold text-zinc-50">Independent developer</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">
+          <p className="text-sm leading-relaxed text-zinc-500">
             A solo builder focused on clean, useful fitness tools. IronTrack was crafted
             with a simple philosophy: no ads, no bloated features — just the tools you
             actually need to train consistently.
