@@ -26,7 +26,7 @@ export type TodaysExercises = Array<{
   } | null
 }>
 
-type DraftSet = { done: boolean; weight: string; reps: string }
+type DraftSet = { done: boolean; weight: string; reps: string; is_warmup: boolean }
 type DraftExercise = {
   exerciseId: string
   name: string
@@ -45,7 +45,12 @@ function toNumber(raw: string): number | null {
 
 function seedSets(sets: number): DraftSet[] {
   const count = Math.max(sets, 1)
-  return Array.from({ length: count }, () => ({ done: false, weight: '', reps: '' }))
+  return Array.from({ length: count }, (_, i) => ({
+    done: false,
+    weight: '',
+    reps: '',
+    is_warmup: i === 0,
+  }))
 }
 
 function buildOfflineWorkout(
@@ -66,7 +71,7 @@ function buildOfflineWorkout(
         const weight = toNumber(s.weight)
         const reps = toNumber(s.reps)
         if (weight == null && reps == null) continue
-        sets.push({ set_number: setNumber++, weight_kg: weight, reps })
+        sets.push({ set_number: setNumber++, weight_kg: weight, reps, is_warmup: s.is_warmup })
       }
       return { weId: generateId(), exercise_id: ex.exerciseId, position: i, sets }
     }),
@@ -181,7 +186,11 @@ export function TodayChecklist({
 
   function addSet(exIndex: number) {
     setAdded((prev) =>
-      prev.map((ex, i) => (i === exIndex ? { ...ex, sets: [...ex.sets, { done: false, weight: '', reps: '' }] } : ex))
+      prev.map((ex, i) =>
+        i === exIndex
+          ? { ...ex, sets: [...ex.sets, { done: false, weight: '', reps: '', is_warmup: false }] }
+          : ex
+      )
     )
   }
 
@@ -238,6 +247,7 @@ export function TodayChecklist({
         set_number: number
         weight_kg: number | null
         reps: number | null
+        is_warmup: boolean
       }> = []
       for (const ex of exercisesToSave) {
         const workoutExerciseId = idByExercise.get(ex.exerciseId)
@@ -252,6 +262,7 @@ export function TodayChecklist({
             set_number: setNumber++,
             weight_kg: weight,
             reps,
+            is_warmup: s.is_warmup,
           })
         }
       }
@@ -332,6 +343,9 @@ export function TodayChecklist({
       </Card>
 
       <div className="space-y-4">
+        <p className="text-[11px] text-zinc-600">
+          Set 1 of each exercise is logged as a warm-up — tap a set number to toggle it.
+        </p>
         {added.map((ex, exIndex) => (
           <Card key={ex.exerciseId} className="p-5 sm:p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -370,9 +384,24 @@ export function TodayChecklist({
                         className="h-4 w-4 accent-lime-400"
                       />
                     </label>
-                    <span className={`text-sm font-medium ${s.done ? 'text-lime-400' : 'text-zinc-400'}`}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateSet(exIndex, setIndex, { is_warmup: !s.is_warmup })
+                      }
+                      aria-pressed={s.is_warmup}
+                      aria-label={`Set ${setIndex + 1}${s.is_warmup ? ', warm-up' : ''} — toggle warm-up`}
+                      className={`flex flex-col items-center justify-center gap-0.5 text-sm font-medium ${
+                        s.done ? 'text-lime-400' : 'text-zinc-400'
+                      }`}
+                    >
                       {setIndex + 1}
-                    </span>
+                      {s.is_warmup ? (
+                        <span className="rounded bg-sky-500/15 px-1 text-[8px] font-bold uppercase leading-tight text-sky-400">
+                          WU
+                        </span>
+                      ) : null}
+                    </button>
                     <Input
                       type="number"
                       inputMode="decimal"

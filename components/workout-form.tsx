@@ -49,8 +49,8 @@ function todayLocal(): string {
   return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 10)
 }
 
-function emptySet(): DraftSet {
-  return { dbId: null, weight: '', reps: '', is_warmup: false }
+function emptySet(isWarmup = false): DraftSet {
+  return { dbId: null, weight: '', reps: '', is_warmup: isWarmup }
 }
 
 function toNumber(raw: string): number | null {
@@ -160,7 +160,7 @@ export function WorkoutForm({ exercises, initial }: { exercises: Exercise[]; ini
   }, [exercises, addedIds, muscleFilter, query])
 
   function addExercise(exercise: Exercise) {
-    setAdded((prev) => [...prev, { weId: null, exercise, sets: [emptySet()] }])
+    setAdded((prev) => [...prev, { weId: null, exercise, sets: [emptySet(true)] }])
     setQuery('')
   }
 
