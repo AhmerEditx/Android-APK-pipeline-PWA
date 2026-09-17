@@ -3,23 +3,45 @@
 import { useMemo, useState } from 'react'
 import type { Exercise } from '@/lib/supabase/types'
 import { IFBB_TOP3, ifbbRankFor } from '@/lib/ifbb-rankings'
+import { EXERCISE_MEDIA_BASE, mediaFor } from '@/lib/exercise-media'
 import { Badge, Card, EmptyState, Input, PageHeader } from '@/components/ui'
 
 export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
   const [query, setQuery] = useState('')
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null)
+  const [subFilter, setSubFilter] = useState<string | null>(null)
   const [showRanks, setShowRanks] = useState(false)
+  const [openId, setOpenId] = useState<string | null>(null)
 
   const muscleGroups = useMemo(
     () => Array.from(new Set(exercises.map((e) => e.muscle_group))).sort(),
     [exercises]
   )
 
+  const subMuscles = useMemo(() => {
+    if (!muscleFilter) return []
+    const subs = Array.from(
+      new Set(
+        exercises
+          .filter((e) => e.muscle_group === muscleFilter)
+          .map((e) => e.primary_muscle)
+          .filter((m): m is string => Boolean(m))
+      )
+    )
+    return subs.sort()
+  }, [exercises, muscleFilter])
+
+  function selectGroup(group: string | null) {
+    setMuscleFilter(group)
+    setSubFilter(null)
+  }
+
   const filtered = useMemo(() => {
     return exercises
       .filter((e) => (muscleFilter ? e.muscle_group === muscleFilter : true))
+      .filter((e) => (subFilter ? e.primary_muscle === subFilter : true))
       .filter((e) => e.name.toLowerCase().includes(query.trim().toLowerCase()))
-  }, [exercises, muscleFilter, query])
+  }, [exercises, muscleFilter, subFilter, query])
 
   const rankedGroups = muscleGroups.filter((g) => IFBB_TOP3[g])
 
@@ -86,10 +108,10 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
         className="mb-4 max-w-md"
       />
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-2 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() => setMuscleFilter(null)}
+          onClick={() => selectGroup(null)}
           className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
             muscleFilter === null
               ? 'border-lime-400 bg-lime-400/10 text-lime-300'
@@ -102,7 +124,7 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
           <button
             key={group}
             type="button"
-            onClick={() => setMuscleFilter(muscleFilter === group ? null : group)}
+            onClick={() => selectGroup(muscleFilter === group ? null : group)}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               muscleFilter === group
                 ? 'border-lime-400 bg-lime-400/10 text-lime-300'
@@ -114,30 +136,92 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
         ))}
       </div>
 
+      {muscleFilter && subMuscles.length > 0 ? (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {subMuscles.map((sub) => (
+            <button
+              key={sub}
+              type="button"
+              onClick={() => setSubFilter(subFilter === sub ? null : sub)}
+              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                subFilter === sub
+                  ? 'border-lime-400 bg-lime-400/10 text-lime-300'
+                  : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+              }`}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {filtered.length === 0 ? (
         <EmptyState title="No exercises found" description="Try a different search or muscle group." />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {filtered.map((exercise) => {
             const rank = ifbbRankFor(exercise.muscle_group, exercise.name)
+            const media = mediaFor(exercise.id)
+            const open = openId === exercise.id
             return (
-              <Card key={exercise.id} className="flex items-center justify-between gap-3 p-4">
-                <div>
-                  <p className="font-medium text-zinc-100">{exercise.name}</p>
-                  <p className="mt-0.5 text-xs text-zinc-500">
-                    {exercise.primary_muscle ?? exercise.muscle_group}
-                  </p>
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  {rank ? (
-                    <Badge tone={rank.rank === 1 ? 'accent' : 'default'}>
-                      <span className="mr-1 text-amber-300">★</span>
-                      IFBB #{rank.rank}
-                    </Badge>
-                  ) : null}
-                  <Badge tone="accent">{exercise.muscle_group}</Badge>
-                  {exercise.equipment ? <Badge tone="muted">{exercise.equipment}</Badge> : null}
-                </div>
+              <Card key={exercise.id} className="overflow-hidden p-0">
+                <button
+                  type="button"
+                  onClick={() => setOpenId(open ? null : exercise.id)}
+                  aria-expanded={open}
+                  className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-zinc-800/40"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    {media ? (
+                      <img
+                        src={`${EXERCISE_MEDIA_BASE}${media.gif}`}
+                        alt=""
+                        loading="lazy"
+                        width={48}
+                        height={48}
+                        className="h-12 w-12 shrink-0 rounded-lg border border-zinc-800 bg-zinc-900 object-cover"
+                      />
+                    ) : null}
+                    <div className="min-w-0">
+                      <p className="font-medium leading-tight text-zinc-100">{exercise.name}</p>
+                      <p className="mt-0.5 truncate text-xs text-zinc-500">
+                        {exercise.primary_muscle ?? exercise.muscle_group}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-1.5">
+                    {rank ? (
+                      <Badge tone={rank.rank === 1 ? 'accent' : 'default'}>
+                        <span className="mr-1 text-amber-300">★</span>
+                        IFBB #{rank.rank}
+                      </Badge>
+                    ) : null}
+                    <Badge tone="accent">{exercise.muscle_group}</Badge>
+                    {exercise.equipment ? <Badge tone="muted">{exercise.equipment}</Badge> : null}
+                  </div>
+                </button>
+
+                {open ? (
+                  <div className="border-t border-zinc-800/80 bg-zinc-900/40 p-4">
+                    {media ? (
+                      <img
+                        src={`${EXERCISE_MEDIA_BASE}${media.gif}`}
+                        alt={`${exercise.name} demo`}
+                        loading="lazy"
+                        width={120}
+                        height={120}
+                        className="mb-3 h-28 w-28 rounded-lg border border-zinc-800 bg-zinc-950 object-cover"
+                      />
+                    ) : null}
+                    {exercise.instructions ? (
+                      <p className="text-sm leading-relaxed text-zinc-300">
+                        {exercise.instructions}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-zinc-500">No instructions available.</p>
+                    )}
+                  </div>
+                ) : null}
               </Card>
             )
           })}

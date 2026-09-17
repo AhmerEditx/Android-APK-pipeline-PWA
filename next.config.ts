@@ -24,7 +24,7 @@ const nextConfig: NextConfig = {
               supabaseUrl
                 ? `connect-src 'self' ${supabaseUrl}`
                 : "connect-src 'self'",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://raw.githubusercontent.com",
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
               `script-src 'self' 'unsafe-inline'${

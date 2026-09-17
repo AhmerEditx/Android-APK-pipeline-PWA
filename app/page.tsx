@@ -82,8 +82,11 @@ export default async function DashboardPage() {
   const doneToday = (todayWorkout ?? null) as unknown as TodayWorkoutRow | null
 
   const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-  const todayIdx = (new Date().getDay() + 6) % 7
   const today = localDateISO()
+
+  const hour = new Date().getHours()
+  const greeting =
+    hour < 5 ? 'night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night'
 
   let planLabel = 'Training plan'
   let dayLabel = 'Training day'
@@ -128,6 +131,7 @@ export default async function DashboardPage() {
     { text: 'Success isn\u2019t always about greatness. It\u2019s about consistency.', emoji: '🏆' },
     { text: 'Rest when you need to. Just don\u2019t quit.', emoji: '🛌' },
   ]
+  const todayIdx = (new Date().getDay() + 6) % 7
   const dailyQuote = quotes[todayIdx]
   const weekCount = workoutsThisWeek ?? 0
   const motivation =
@@ -185,7 +189,7 @@ export default async function DashboardPage() {
   return (
     <div>
       <PageHeader
-        title={`Good ${todayIdx < 5 ? 'morning' : 'evening'}, ${firstName}`}
+        title={`Good ${greeting}, ${firstName}`}
         description={
           doneToday
             ? "You have trained today — nice work."

@@ -14,6 +14,7 @@ import {
   ChartIcon,
   ChevronIcon,
   CloseIcon,
+  ExercisesIcon,
   FeedbackIcon,
   HistoryIcon,
   HomeIcon,
@@ -28,6 +29,7 @@ import {
 const desktopLinks = [
   { href: '/', label: 'Dashboard' },
   { href: '/today', label: 'Today' },
+  { href: '/exercises', label: 'Exercises' },
   { href: '/plans', label: 'Plans' },
   { href: '/history', label: 'History' },
   { href: '/progress', label: 'Progress' },
@@ -35,12 +37,22 @@ const desktopLinks = [
   { href: '/profile', label: 'Profile' },
 ]
 
-const tabBarLinks = [
-  { href: '/', label: 'Home', icon: HomeIcon },
-  { href: '/today', label: 'Today', icon: TodayIcon },
-  { href: '/plans', label: 'Plans', icon: PlansIcon },
-  { href: '/progress', label: 'Progress', icon: ChartIcon },
-]
+const tabBarLinksFor = (hasPlan: boolean) => {
+  if (hasPlan) {
+    return [
+      { href: '/', label: 'Home', icon: HomeIcon },
+      { href: '/today', label: 'Today', icon: TodayIcon },
+      { href: '/exercises', label: 'Exercises', icon: ExercisesIcon },
+      { href: '/progress', label: 'Progress', icon: ChartIcon },
+    ]
+  }
+  return [
+    { href: '/', label: 'Home', icon: HomeIcon },
+    { href: '/plans', label: 'Plans', icon: PlansIcon },
+    { href: '/exercises', label: 'Exercises', icon: ExercisesIcon },
+    { href: '/progress', label: 'Progress', icon: ChartIcon },
+  ]
+}
 
 export function Nav() {
   const pathname = usePathname()
@@ -49,6 +61,7 @@ export function Nav() {
   const [ready, setReady] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [unread, setUnread] = useState(0)
+  const [hasPlan, setHasPlan] = useState(false)
   const [profileName, setProfileName] = useState<string | null>(null)
   const [profileEmail, setProfileEmail] = useState<string | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -136,9 +149,30 @@ export function Nav() {
     }
   }, [])
 
+  useEffect(() => {
+    const supabase = createClient()
+    let cancelled = false
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (cancelled) return
+      if (!data.user) {
+        setHasPlan(false)
+        return
+      }
+      const { count: planCount } = await supabase
+        .from('user_plans')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', data.user.id)
+        .eq('active', true)
+      if (cancelled) return
+      setHasPlan((planCount ?? 0) > 0)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
+
   const links = [...desktopLinks]
   if (isAdmin) links.push({ href: '/admin', label: 'Admin' })
-  links.push({ href: '/messages', label: 'Messages' })
 
   const isAuthPage = pathname === '/login' || pathname === '/signup'
 
@@ -155,6 +189,7 @@ export function Nav() {
     badge?: number
   }> = [
     { href: '/history', label: 'History', description: 'Past workouts and sessions', icon: HistoryIcon },
+    { href: '/exercises', label: 'Exercises', description: 'Browse the full exercise library', icon: ExercisesIcon },
     { href: '/achievements', label: 'Achievements', description: 'Milestones and streak badges', icon: TrophyIcon },
     { href: '/messages', label: 'Messages', description: 'Messages from the app', icon: MessagesIcon, badge: unread },
     { href: '/feedback', label: 'Feedback', description: 'Report a bug, suggest an idea', icon: FeedbackIcon },
@@ -199,14 +234,14 @@ export function Nav() {
           </div>
 
           {showNav ? (
-            <nav className="hidden items-center gap-1 lg:flex">
+            <nav className="hidden min-w-0 items-center gap-1 lg:flex">
               {links.map((link) => {
                 const active = isActive(link.href)
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    className={`relative whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       active
                         ? 'bg-zinc-800 text-zinc-50'
                         : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
@@ -230,7 +265,7 @@ export function Nav() {
                 <Link
                   href="/messages"
                   aria-label="Messages"
-                  className={`relative hidden items-center rounded-md p-2 text-sm transition-colors lg:flex ${
+                  className={`relative hidden shrink-0 items-center rounded-md p-2 text-sm transition-colors lg:flex ${
                     isActive('/messages')
                       ? 'bg-zinc-800 text-zinc-50'
                       : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
@@ -256,7 +291,7 @@ export function Nav() {
             className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-stretch border-t border-zinc-800/80 bg-zinc-950/95 backdrop-blur lg:hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
           >
-            {tabBarLinks.map((tab) => {
+            {tabBarLinksFor(hasPlan).map((tab) => {
               const active = isActive(tab.href)
               const Icon = tab.icon
               return (
