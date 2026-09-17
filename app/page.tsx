@@ -4,6 +4,7 @@ import { formatDate, computeWorkoutStreaks, startOfWeek, localDateISO, daysBetwe
 import { REST, defaultScheduleForDays, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui'
 import { DeleteWorkoutButton } from '@/components/delete-workout-button'
+import { MonthCalendar } from '@/components/month-calendar'
 
 type UserPlanRow = {
   id: string
@@ -140,46 +141,42 @@ export default async function DashboardPage() {
 
   const year = new Date().getFullYear()
   const month = new Date().getMonth()
-  const monthFull = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' })
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-  const todayDay = new Date().getDate()
-  const completedDates = new Set((allDateRows ?? []).map((r) => r.date))
+  const doneDates = (allDateRows ?? []).map((r) => r.date)
 
   const spotlights = [
     {
       name: 'Deadlift',
-      emoji: '🏋️',
+      emoji: '⚖️',
       text: 'The king of compound movements. Hits your back, glutes, hamstrings, and core in one powerful pull. Master the hinge, own the weight.',
     },
     {
       name: 'Back Squat',
-      emoji: '🏋️',
+      emoji: '🦵',
       text: 'The foundation of leg strength. Quads, glutes, and core all get worked through a full range of motion. Depth beats ego.',
     },
     {
       name: 'Bench Press',
-      emoji: '🏋️',
+      emoji: '💪',
       text: 'The classic upper-body builder. Chest, shoulders, and triceps working together. Control the bar on the way down.',
     },
     {
       name: 'Overhead Press',
-      emoji: '🏋️',
+      emoji: '🙌',
       text: 'Builds powerful shoulders and a rock-solid core. Press heavy, stay braced, and don\u2019t let the lower back arch.',
     },
     {
       name: 'Pull-Up',
-      emoji: '🔝',
+      emoji: '🧗',
       text: 'Nothing builds a wider back like pull-ups. If you can\u2019t do one yet, start with negatives or assisted reps.',
     },
     {
       name: 'Barbell Row',
-      emoji: '🏋️',
+      emoji: '🚣',
       text: 'Adds thickness to your back and strength to your pulls. Bang your chest to the bar, then lower under control.',
     },
     {
       name: 'Romanian Deadlift',
-      emoji: '🏋️',
+      emoji: '🍑',
       text: 'The hamstring and glute difference-maker. Push your hips back, keep the bar close, and feel the stretch in the hammies.',
     },
   ]
@@ -291,52 +288,15 @@ export default async function DashboardPage() {
       </div>
 
       {/* Active month */}
-      <Card className="mb-4 p-4">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-bold text-zinc-100">{monthFull}</p>
-          <span className="text-[10px] text-zinc-500">
-            {weekCount} workout{weekCount === 1 ? '' : 's'} this week
-          </span>
-        </div>
-        <div className="mt-2 grid grid-cols-7 justify-items-center">
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-            <span key={`h${i}`} className="text-[10px] font-semibold text-zinc-500">
-              {d}
-            </span>
-          ))}
-          {Array.from({ length: firstWeekday }).map((_, i) => (
-            <span key={`e${i}`} />
-          ))}
-          {Array.from({ length: daysInMonth }).map((_, i) => {
-            const day = i + 1
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-            const done = completedDates.has(dateStr) || (day === todayDay && Boolean(doneToday))
-            const isToday = day === todayDay
-            return (
-              <span
-                key={day}
-                className={`relative flex h-8 w-8 items-center justify-center rounded-full text-xs ${
-                  done
-                    ? 'bg-lime-400 font-semibold text-zinc-950'
-                    : isToday
-                      ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
-                      : 'text-zinc-600'
-                }`}
-              >
-                {day}
-                {done && (
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-zinc-950 text-[6px] font-bold leading-none text-lime-400">
-                    ✓
-                  </span>
-                )}
-              </span>
-            )
-          })}
-        </div>
-        <p className="mt-2 text-[10px] leading-snug text-zinc-500">
-          {motivation.emoji} {motivation.text}
-        </p>
-      </Card>
+      <MonthCalendar
+        defaultYear={year}
+        defaultMonth={month}
+        doneDates={doneDates}
+        today={today}
+        doneToday={Boolean(doneToday)}
+        weekCount={weekCount}
+        motivation={motivation}
+      />
 
       {/* Exercise spotlight */}
       <Card className="mb-4 overflow-hidden p-0">
