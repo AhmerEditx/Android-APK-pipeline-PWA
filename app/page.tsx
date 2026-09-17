@@ -146,6 +146,45 @@ export default async function DashboardPage() {
   const todayDay = new Date().getDate()
   const completedDates = new Set((allDateRows ?? []).map((r) => r.date))
 
+  const spotlights = [
+    {
+      name: 'Deadlift',
+      emoji: '🏋️',
+      text: 'The king of compound movements. Hits your back, glutes, hamstrings, and core in one powerful pull. Master the hinge, own the weight.',
+    },
+    {
+      name: 'Back Squat',
+      emoji: '🏋️',
+      text: 'The foundation of leg strength. Quads, glutes, and core all get worked through a full range of motion. Depth beats ego.',
+    },
+    {
+      name: 'Bench Press',
+      emoji: '🏋️',
+      text: 'The classic upper-body builder. Chest, shoulders, and triceps working together. Control the bar on the way down.',
+    },
+    {
+      name: 'Overhead Press',
+      emoji: '🏋️',
+      text: 'Builds powerful shoulders and a rock-solid core. Press heavy, stay braced, and don\u2019t let the lower back arch.',
+    },
+    {
+      name: 'Pull-Up',
+      emoji: '🔝',
+      text: 'Nothing builds a wider back like pull-ups. If you can\u2019t do one yet, start with negatives or assisted reps.',
+    },
+    {
+      name: 'Barbell Row',
+      emoji: '🏋️',
+      text: 'Adds thickness to your back and strength to your pulls. Bang your chest to the bar, then lower under control.',
+    },
+    {
+      name: 'Romanian Deadlift',
+      emoji: '🏋️',
+      text: 'The hamstring and glute difference-maker. Push your hips back, keep the bar close, and feel the stretch in the hammies.',
+    },
+  ]
+  const spotlight = spotlights[new Date().getDate() % spotlights.length]
+
   return (
     <div>
       <PageHeader
@@ -306,16 +345,11 @@ export default async function DashboardPage() {
             <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-zinc-500">
               <span className="text-base">💀</span> Exercise spotlight
             </p>
-            <p className="mt-1 text-base font-bold text-zinc-50">
-              Deadlift
-            </p>
-            <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-              The king of compound movements. Hits your back, glutes, hamstrings, and core
-              in one powerful pull. Master the hinge, own the weight.
-            </p>
+            <p className="mt-1 text-base font-bold text-zinc-50">{spotlight.name}</p>
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">{spotlight.text}</p>
           </div>
           <div className="flex w-20 items-center justify-center bg-zinc-900">
-            <span className="text-5xl">🏋️</span>
+            <span className="text-5xl">{spotlight.emoji}</span>
           </div>
         </div>
       </Card>
