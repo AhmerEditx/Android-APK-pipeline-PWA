@@ -10,7 +10,6 @@ import {
   addPendingWorkout,
   generateId,
   isNetworkError,
-  isOnline,
   type OfflineWorkout,
 } from '@/lib/offline'
 
@@ -210,13 +209,6 @@ export function WorkoutForm({ exercises, initial }: { exercises: Exercise[]; ini
 
     setSaving(true)
     setError(null)
-
-    if (!isEdit && !isOnline()) {
-      addPendingWorkout(buildOfflineWorkout(date, notes, added))
-      setSavedOffline(true)
-      setSaving(false)
-      return
-    }
 
     const supabase = createClient()
 

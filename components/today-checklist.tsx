@@ -9,7 +9,6 @@ import {
   addPendingWorkout,
   generateId,
   isNetworkError,
-  isOnline,
   type OfflineWorkout,
 } from '@/lib/offline'
 
@@ -211,13 +210,6 @@ export function TodayChecklist({
     setError(null)
 
     const offlinePayload = buildOfflineWorkout(date, notes, planDayId, exercisesToSave)
-
-    if (!isOnline()) {
-      addPendingWorkout(offlinePayload)
-      setSavedOffline(true)
-      setSaving(false)
-      return
-    }
 
     try {
       const { data, error: workoutErr } = await supabase

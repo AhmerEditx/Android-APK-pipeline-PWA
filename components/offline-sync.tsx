@@ -61,15 +61,53 @@ async function insertWorkoutOnline(workout: OfflineWorkout) {
   }
 }
 
+// navigator.onLine is unreliable (reports false while actually online on some
+// browsers/WebViews), so confirm connectivity with a real network request.
+// /favicon.ico is not intercepted by the service worker, so any response
+// (even an HTTP 404) proves the network is reachable.
+async function probeNetwork(): Promise<boolean> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 5000)
+  try {
+    await fetch('/favicon.ico', {
+      method: 'HEAD',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+    return true
+  } catch {
+    return false
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 export function OfflineSync() {
-  const [online, setOnline] = useState(() => isOnline())
+  const [online, setOnline] = useState<boolean | null>(null)
   const [pending, setPending] = useState(() => getPendingCount())
   const [syncing, setSyncing] = useState(false)
   const syncingRef = useRef(false)
+  const probingRef = useRef(false)
+  const onlineRef = useRef<boolean | null>(null)
+
+  function setOnlineState(value: boolean) {
+    onlineRef.current = value
+    setOnline(value)
+  }
+
+  const determineOnline = useCallback(async () => {
+    if (probingRef.current) return
+    probingRef.current = true
+    try {
+      setOnlineState(await probeNetwork())
+    } finally {
+      probingRef.current = false
+    }
+  }, [])
 
   const syncNow = useCallback(async () => {
     if (syncingRef.current) return
-    if (!isOnline()) return
+    if (onlineRef.current === false) return
     const items = getPendingWorkouts()
     if (items.length === 0) return
 
@@ -83,6 +121,7 @@ export function OfflineSync() {
     } catch (err) {
       if (isNetworkError(err)) {
         syncingRef.current = false
+        setOnlineState(false)
         return
       }
       throw err
@@ -100,7 +139,10 @@ export function OfflineSync() {
         removePendingWorkout(item.workoutId)
         setPending(getPendingCount())
       } catch (err) {
-        if (isNetworkError(err)) break
+        if (isNetworkError(err)) {
+          setOnlineState(false)
+          break
+        }
         removePendingWorkout(item.workoutId)
         setPending(getPendingCount())
       }
@@ -138,16 +180,16 @@ export function OfflineSync() {
   }, [])
 
   useEffect(() => {
-    const initialSync = setTimeout(syncNow, 0)
+    determineOnline()
 
     const onOnline = () => {
-      setOnline(true)
+      setOnlineState(true)
       syncNow()
     }
-    const onOffline = () => setOnline(false)
+    const onOffline = () => determineOnline()
     const onVisibility = () => {
       if (!document.hidden) {
-        setOnline(isOnline())
+        determineOnline()
         syncNow()
       }
     }
@@ -161,31 +203,41 @@ export function OfflineSync() {
     })
 
     return () => {
-      clearTimeout(initialSync)
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('focus', onVisibility)
       document.removeEventListener('visibilitychange', onVisibility)
       unsubscribe()
     }
-  }, [syncNow])
+  }, [determineOnline, syncNow])
 
-if (!online) {
-  return (
-    <div className="fixed inset-x-0 bottom-16 z-40 mx-auto max-w-md px-4">
-      <div className="flex items-center gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-950/90 px-4 py-3 text-sm text-amber-200 shadow-lg backdrop-blur">
-        <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-400" />
-        <span>
-          {pending > 0
-            ? `Offline — ${pending} workout${pending === 1 ? '' : 's'} stored locally. Will sync when you reconnect.`
-            : 'Offline — showing saved copy. Workouts you log will sync when you reconnect.'}
-        </span>
+  // While confirmed offline, keep re-probing so a reconnect is picked up even
+  // if the browser never fires an 'online' event.
+  useEffect(() => {
+    if (online !== false) return
+    const id = setInterval(() => {
+      determineOnline()
+      syncNow()
+    }, 15000)
+    return () => clearInterval(id)
+  }, [online, determineOnline, syncNow])
+
+  if (online === false) {
+    return (
+      <div className="fixed inset-x-0 bottom-16 z-40 mx-auto max-w-md px-4">
+        <div className="flex items-center gap-2.5 rounded-2xl border border-amber-400/30 bg-amber-950/90 px-4 py-3 text-sm text-amber-200 shadow-lg backdrop-blur">
+          <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-400" />
+          <span>
+            {pending > 0
+              ? `Offline — ${pending} workout${pending === 1 ? '' : 's'} stored locally. Will sync when you reconnect.`
+              : 'Offline — showing saved copy. Workouts you log will sync when you reconnect.'}
+          </span>
+        </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-  if (online && pending > 0) {
+  if (pending > 0) {
     return (
       <div className="fixed inset-x-0 bottom-16 z-40 mx-auto max-w-md px-4">
         <div className="flex items-center gap-2.5 rounded-2xl border border-lime-400/30 bg-lime-950/90 px-4 py-3 text-sm text-lime-200 shadow-lg backdrop-blur">
