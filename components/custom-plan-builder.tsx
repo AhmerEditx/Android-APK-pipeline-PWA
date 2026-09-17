@@ -47,6 +47,7 @@ export function CustomPlanBuilder({
   const [mode, setMode] = useState<'template' | 'blank'>('blank')
   const [planName, setPlanName] = useState('')
   const [templateId, setTemplateId] = useState<string>('')
+  const [templateLoaded, setTemplateLoaded] = useState(false)
   const [dayCount, setDayCount] = useState(3)
   const [days, setDays] = useState<BuilderDay[]>(() => blankDays(3))
   const [focusedDay, setFocusedDay] = useState(0)
@@ -76,7 +77,17 @@ export function CustomPlanBuilder({
   function chooseTemplate(id: string) {
     const t = templates.find((tpl) => tpl.id === id)
     if (!t) return
+    if (
+      !templateLoaded &&
+      days.some((d) => d.exercises.length > 0) &&
+      !window.confirm(
+        'Cloning a template will replace everything you built from scratch. This cannot be undone. Continue?'
+      )
+    ) {
+      return
+    }
     setTemplateId(id)
+    setTemplateLoaded(true)
     setPlanName(t.name)
     setDayCount(t.days.length)
     setDays(
@@ -88,14 +99,23 @@ export function CustomPlanBuilder({
   }
 
   function switchMode(next: 'template' | 'blank') {
+    if (next === 'blank' && templateLoaded) {
+      if (
+        !window.confirm(
+          'Switching to a blank plan will discard the cloned template. This cannot be undone. Continue?'
+        )
+      ) {
+        return
+      }
+      setTemplateId('')
+      setTemplateLoaded(false)
+      setPlanName('')
+      setDayCount(3)
+      setDays(blankDays(3))
+      setFocusedDay(0)
+    }
     setMode(next)
     setError(null)
-    if (next === 'blank') {
-      setTemplateId('')
-      if (days.length === 0) setDays(blankDays(dayCount))
-    } else {
-      setTemplateId(templates[0]?.id ?? '')
-    }
   }
 
   function setCount(count: number) {
