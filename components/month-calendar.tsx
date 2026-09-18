@@ -1,11 +1,16 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Badge, Card } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const MONTH_NAMES_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 type DayWorkout = {
   id: string
@@ -18,6 +23,14 @@ type DayWorkout = {
 
 function pad(n: number): string {
   return String(n).padStart(2, '0')
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate()
+}
+
+function firstWeekday(year: number, month: number): number {
+  return (new Date(year, month, 1).getDay() + 6) % 7
 }
 
 export function MonthCalendar({
@@ -39,23 +52,60 @@ export function MonthCalendar({
 }) {
   const [year, setYear] = useState(defaultYear)
   const [month, setMonth] = useState(defaultMonth)
+  const [view, setView] = useState<'month' | 'year'>('month')
   const [selected, setSelected] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [workouts, setWorkouts] = useState<DayWorkout[] | null>(null)
 
-  const maxReached = year === defaultYear && month === defaultMonth
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const doneDateSet = useMemo(() => new Set(doneDates), [doneDates])
 
-  function selectDay(day: number) {
-    const date = `${year}-${pad(month + 1)}-${pad(day)}`
-    if (date === selected) return
+  const maxReached = view === 'year'
+    ? year >= defaultYear
+    : year === defaultYear && month === defaultMonth
+
+  const yearCount = useMemo(
+    () => doneDates.filter((d) => d.startsWith(`${year}-`)).length,
+    [doneDates, year]
+  )
+
+  function monthCount(m: number): number {
+    const prefix = `${year}-${pad(m + 1)}-`
+    return doneDates.filter((d) => d.startsWith(prefix)).length
+  }
+
+  function isDone(y: number, m: number, day: number): boolean {
+    const dateStr = `${y}-${pad(m + 1)}-${pad(day)}`
+    return doneDateSet.has(dateStr) || (dateStr === today && doneToday)
+  }
+
+  function selectDate(y: number, m: number, day: number) {
+    const date = `${y}-${pad(m + 1)}-${pad(day)}`
+    if (date === selected) {
+      setSelected(null)
+      setWorkouts(null)
+      return
+    }
     setSelected(date)
     setLoading(true)
     setWorkouts(null)
   }
 
+  function selectDay(day: number) {
+    selectDate(year, month, day)
+  }
+
+  function openDayFromYear(m: number, day: number) {
+    setYear(year)
+    setMonth(m)
+    setView('month')
+    selectDate(year, m, day)
+  }
+
   function goBack() {
+    if (view === 'year') {
+      setYear(year - 1)
+      return
+    }
     const prev = new Date(year, month - 1, 1)
     setYear(prev.getFullYear())
     setMonth(prev.getMonth())
@@ -63,6 +113,10 @@ export function MonthCalendar({
 
   function goForward() {
     if (maxReached) return
+    if (view === 'year') {
+      setYear(year + 1)
+      return
+    }
     const next = new Date(year, month + 1, 1)
     setYear(next.getFullYear())
     setMonth(next.getMonth())
@@ -113,7 +167,7 @@ export function MonthCalendar({
           <button
             type="button"
             onClick={goBack}
-            aria-label="Previous month"
+            aria-label="Previous"
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 text-zinc-400 transition-colors hover:bg-zinc-800"
           >
             ‹
@@ -121,137 +175,228 @@ export function MonthCalendar({
           <button
             type="button"
             onClick={goForward}
-            aria-label="Next month"
+            aria-label="Next"
             disabled={maxReached}
             className="flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-800 text-zinc-400 transition-colors hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-30"
           >
             ›
           </button>
-          <p className="text-sm font-bold text-zinc-100">{monthLabel}</p>
+          <button
+            type="button"
+            onClick={() => setView(view === 'month' ? 'year' : 'month')}
+            aria-label={view === 'month' ? 'Show full year' : 'Back to month view'}
+            className="group flex items-center gap-1 rounded-md px-1 py-0.5 text-sm font-bold text-zinc-100 transition-colors hover:bg-zinc-800"
+          >
+            {view === 'month' ? monthLabel : String(year)}
+            <span
+              className={`text-[9px] text-zinc-500 transition-transform group-hover:text-zinc-300 ${
+                view === 'year' ? 'rotate-180' : ''
+              }`}
+            >
+              ▾
+            </span>
+          </button>
         </div>
         <span className="text-[10px] text-zinc-500">
-          {weekCount} workout{weekCount === 1 ? '' : 's'} this week
+          {view === 'year'
+            ? `${yearCount} workout${yearCount === 1 ? '' : 's'} in ${year}`
+            : `${weekCount} workout${weekCount === 1 ? '' : 's'} this week`}
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-7 justify-items-center">
-        {WEEKDAYS.map((d, i) => (
-          <span key={`h${i}`} className="pb-1 text-[10px] font-semibold text-zinc-500">
-            {d}
-          </span>
-        ))}
-        {Array.from({ length: firstWeekday }).map((_, i) => (
-          <span key={`e${i}`} className="h-8" />
-        ))}
-        {Array.from({ length: daysInMonth }).map((_, i) => {
-          const day = i + 1
-          const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`
-          const done = doneDates.includes(dateStr) || (dateStr === today && doneToday)
-          const isToday = dateStr === today
-          const isSelected = dateStr === selected
-          return (
-            <button
-              key={day}
-              type="button"
-              onClick={() => selectDay(day)}
-              aria-label={`${monthLabel} ${day}`}
-              className={`relative flex h-9 w-9 items-center justify-center rounded-full text-xs transition-colors ${
-                done
-                  ? 'bg-lime-400 font-semibold text-zinc-950'
-                  : isSelected
-                    ? 'bg-zinc-100 font-semibold text-zinc-950'
-                    : isToday
-                      ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
-                      : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
-              }`}
-            >
-              {day}
-              {isToday && !done && (
-                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-lime-400" />
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {selected ? (
-        <div className="mt-3 border-t border-zinc-800/80 pt-3">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-              {formatDate(selected)}
-            </p>
-            {workouts && workouts.length > 0 && (
-              <Badge tone="accent">
-                {workouts.length} workout{workouts.length === 1 ? '' : 's'}
-              </Badge>
-            )}
-          </div>
-
-          {loading ? (
-            <p className="py-2 text-sm text-zinc-500">Loading…</p>
-          ) : workouts && workouts.length > 0 ? (
-            <div className="space-y-2">
-              {workouts.map((w) => {
-                const totalSets = w.workout_exercises.reduce(
-                  (sum, we) => sum + we.sets.filter((s) => !s.is_warmup).length,
-                  0
-                )
-                const volume = w.workout_exercises.reduce(
-                  (sum, we) =>
-                    sum +
-                    we.sets
-                      .filter((s) => !s.is_warmup)
-                      .reduce((acc, s) => acc + (s.weight_kg ?? 0) * (s.reps ?? 0), 0),
-                  0
-                )
-                return (
-                  <div key={w.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-zinc-100">Session</p>
-                      <Badge tone="muted">{totalSets} sets</Badge>
-                      {volume > 0 && <Badge tone="muted">{Math.round(volume)} kg volume</Badge>}
-                    </div>
-                    {w.notes ? (
-                      <p className="mt-1.5 text-xs text-zinc-500">&ldquo;{w.notes}&rdquo;</p>
+      {view === 'year' ? (
+        <div className="mt-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 12 }).map((_, m) => {
+              const dim = daysInMonth(year, m)
+              const lead = firstWeekday(year, m)
+              const count = monthCount(m)
+              return (
+                <div
+                  key={m}
+                  className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2"
+                >
+                  <div className="mb-1 flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-300">
+                      {MONTH_NAMES[m]}
+                    </p>
+                    {count > 0 ? (
+                      <span className="rounded-full bg-lime-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-lime-300">
+                        {count}
+                      </span>
                     ) : null}
-                    <div className="mt-2 space-y-1.5">
-                      {w.workout_exercises.map((we, idx) => {
-                        const sets = we.sets.filter((s) => !s.is_warmup)
-                        return (
-                          <div
-                            key={idx}
-                            className="flex items-baseline justify-between gap-3 text-xs"
-                          >
-                            <span className="font-medium text-zinc-300">
-                              {we.exercises?.name ?? 'Exercise'}
-                            </span>
-                            <span className="text-right text-zinc-500">
-                              {sets.length > 0
-                                ? sets
-                                    .map(
-                                      (s) =>
-                                        `${s.weight_kg != null ? Math.round(s.weight_kg) : '—'}×${s.reps ?? '—'}`
-                                    )
-                                    .join(' · ')
-                                : 'no sets'}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
                   </div>
-                )
-              })}
-            </div>
-          ) : workouts ? (
-            <p className="py-2 text-sm text-zinc-500">Rest day — no workout logged.</p>
-          ) : null}
+                  <div className="grid grid-cols-7 justify-items-center">
+                    {WEEKDAYS.map((d, i) => (
+                      <span key={`h${m}-${i}`} className="pb-0.5 text-[8px] font-semibold text-zinc-600">
+                        {d}
+                      </span>
+                    ))}
+                    {Array.from({ length: lead }).map((_, i) => (
+                      <span key={`e${m}-${i}`} className="h-4" />
+                    ))}
+                    {Array.from({ length: dim }).map((_, i) => {
+                      const day = i + 1
+                      const done = isDone(year, m, day)
+                      const isToday = `${year}-${pad(m + 1)}-${pad(day)}` === today
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => openDayFromYear(m, day)}
+                          className={`flex h-4 w-4 items-center justify-center rounded-full text-[8px] leading-none transition-colors ${
+                            done
+                              ? 'bg-lime-400 font-bold text-zinc-950'
+                              : isToday
+                                ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
+                                : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-zinc-500">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-lime-400" /> Trained
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full ring-1 ring-lime-400/60" /> Today
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-zinc-800" /> Rest
+            </span>
+            <span className="ml-auto">
+              Tap a day to open that date.
+            </span>
+          </div>
         </div>
       ) : (
-        <p className="mt-2 text-[10px] leading-snug text-zinc-500">
-          {motivation.emoji} {motivation.text} — Tap a date to see that day&apos;s progress.
-        </p>
+        <div className="mt-3 grid grid-cols-7 justify-items-center">
+          {WEEKDAYS.map((d, i) => (
+            <span key={`h${i}`} className="pb-1 text-[10px] font-semibold text-zinc-500">
+              {d}
+            </span>
+          ))}
+          {Array.from({ length: firstWeekday(year, month) }).map((_, i) => (
+            <span key={`e${i}`} className="h-8" />
+          ))}
+          {Array.from({ length: daysInMonth(year, month) }).map((_, i) => {
+            const day = i + 1
+            const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`
+            const done = doneDateSet.has(dateStr) || (dateStr === today && doneToday)
+            const isSelected = dateStr === selected
+            return (
+              <button
+                key={day}
+                type="button"
+                onClick={() => selectDay(day)}
+                aria-label={`${MONTH_NAMES_FULL[month]} ${day}`}
+                className={`relative flex h-9 w-9 items-center justify-center rounded-full text-xs transition-colors ${
+                  done
+                    ? 'bg-lime-400 font-semibold text-zinc-950'
+                    : isSelected
+                      ? 'bg-zinc-100 font-semibold text-zinc-950'
+                      : dateStr === today
+                        ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
+                        : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
+                }`}
+              >
+                {day}
+                {dateStr === today && !done && (
+                  <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-lime-400" />
+                )}
+              </button>
+            )
+          })}
+        </div>
       )}
+
+      {view === 'month' ? (
+        selected ? (
+          <div className="mt-3 border-t border-zinc-800/80 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                {formatDate(selected)}
+              </p>
+              {workouts && workouts.length > 0 && (
+                <Badge tone="accent">
+                  {workouts.length} workout{workouts.length === 1 ? '' : 's'}
+                </Badge>
+              )}
+            </div>
+
+            {loading ? (
+              <p className="py-2 text-sm text-zinc-500">Loading…</p>
+            ) : workouts && workouts.length > 0 ? (
+              <div className="space-y-2">
+                {workouts.map((w) => {
+                  const totalSets = w.workout_exercises.reduce(
+                    (sum, we) => sum + we.sets.filter((s) => !s.is_warmup).length,
+                    0
+                  )
+                  const volume = w.workout_exercises.reduce(
+                    (sum, we) =>
+                      sum +
+                      we.sets
+                        .filter((s) => !s.is_warmup)
+                        .reduce((acc, s) => acc + (s.weight_kg ?? 0) * (s.reps ?? 0), 0),
+                    0
+                  )
+                  return (
+                    <div key={w.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-semibold text-zinc-100">Session</p>
+                        <Badge tone="muted">{totalSets} sets</Badge>
+                        {volume > 0 && <Badge tone="muted">{Math.round(volume)} kg volume</Badge>}
+                      </div>
+                      {w.notes ? (
+                        <p className="mt-1.5 text-xs text-zinc-500">&ldquo;{w.notes}&rdquo;</p>
+                      ) : null}
+                      <div className="mt-2 space-y-1.5">
+                        {w.workout_exercises.map((we, idx) => {
+                          const sets = we.sets.filter((s) => !s.is_warmup)
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-baseline justify-between gap-3 text-xs"
+                            >
+                              <span className="font-medium text-zinc-300">
+                                {we.exercises?.name ?? 'Exercise'}
+                              </span>
+                              <span className="text-right text-zinc-500">
+                                {sets.length > 0
+                                  ? sets
+                                      .map(
+                                        (s) =>
+                                          `${s.weight_kg != null ? Math.round(s.weight_kg) : '—'}×${s.reps ?? '—'}`
+                                      )
+                                      .join(' · ')
+                                  : 'no sets'}
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : workouts ? (
+              <p className="py-2 text-sm text-zinc-500">Rest day — no workout logged.</p>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-2 text-[10px] leading-snug text-zinc-500">
+            {motivation.emoji} {motivation.text} — Tap a date to see that day&apos;s progress.
+          </p>
+        )
+      ) : null}
     </Card>
   )
 }

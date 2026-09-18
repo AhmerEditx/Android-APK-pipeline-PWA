@@ -19,9 +19,9 @@ import {
   HistoryIcon,
   HomeIcon,
   MessagesIcon,
-  MoreIcon,
   PlansIcon,
   ProfileIcon,
+  SettingsIcon,
   TodayIcon,
   TrophyIcon,
 } from './icons'
@@ -44,6 +44,7 @@ const tabBarLinksFor = (hasPlan: boolean) => {
       { href: '/today', label: 'Today', icon: TodayIcon },
       { href: '/exercises', label: 'Exercises', icon: ExercisesIcon },
       { href: '/progress', label: 'Progress', icon: ChartIcon },
+      { href: '/achievements', label: 'Achievements', icon: TrophyIcon },
     ]
   }
   return [
@@ -51,6 +52,7 @@ const tabBarLinksFor = (hasPlan: boolean) => {
     { href: '/plans', label: 'Plans', icon: PlansIcon },
     { href: '/exercises', label: 'Exercises', icon: ExercisesIcon },
     { href: '/progress', label: 'Progress', icon: ChartIcon },
+    { href: '/achievements', label: 'Achievements', icon: TrophyIcon },
   ]
 }
 
@@ -278,6 +280,23 @@ export function Nav() {
                     </span>
                   ) : null}
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => setMoreOpen(true)}
+                  aria-label="More"
+                  className={`relative flex shrink-0 items-center justify-center rounded-md p-2 text-sm transition-colors lg:hidden ${
+                    moreOpen || sheetLinks.some((l) => isActive(l.href))
+                      ? 'bg-zinc-800 text-zinc-50'
+                      : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'
+                  }`}
+                >
+                  <SettingsIcon className="h-5 w-5" />
+                  {unread > 0 ? (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-lime-400 px-1 text-[10px] font-bold text-zinc-950">
+                      {unread}
+                    </span>
+                  ) : null}
+                </button>
                 <LogoutButton />
               </>
             ) : null}
@@ -307,25 +326,6 @@ export function Nav() {
                 </Link>
               )
             })}
-            <button
-              type="button"
-              onClick={() => setMoreOpen(true)}
-              className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium ${
-                moreOpen || sheetLinks.some((l) => isActive(l.href))
-                  ? 'text-lime-400'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <span className="relative">
-                <MoreIcon className="h-6 w-6" />
-                {unread > 0 ? (
-                  <span className="absolute -right-1.5 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-lime-400 px-0.5 text-[9px] font-bold text-zinc-950">
-                    {unread}
-                  </span>
-                ) : null}
-              </span>
-              More
-            </button>
           </nav>
 
           {moreOpen ? (

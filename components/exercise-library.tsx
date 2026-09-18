@@ -137,21 +137,30 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
       </div>
 
       {muscleFilter && subMuscles.length > 0 ? (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {subMuscles.map((sub) => (
-            <button
-              key={sub}
-              type="button"
-              onClick={() => setSubFilter(subFilter === sub ? null : sub)}
-              className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-                subFilter === sub
-                  ? 'border-lime-400 bg-lime-400/10 text-lime-300'
-                  : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {sub}
-            </button>
-          ))}
+        <div className="mb-4">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="h-px flex-1 bg-zinc-800" />
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+              Focused muscles
+            </span>
+            <span className="h-px flex-1 bg-zinc-800" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {subMuscles.map((sub) => (
+              <button
+                key={sub}
+                type="button"
+                onClick={() => setSubFilter(subFilter === sub ? null : sub)}
+                className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                  subFilter === sub
+                    ? 'border-lime-400 bg-lime-400/10 text-lime-300'
+                    : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+                }`}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 
