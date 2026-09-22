@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Badge, Card } from '@/components/ui'
 import { formatDate } from '@/lib/utils'
+import { REST, slotForDate, type ScheduleSlotList } from '@/lib/schedule'
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -37,18 +38,24 @@ export function MonthCalendar({
   defaultYear,
   defaultMonth,
   doneDates,
+  missedDates = [],
   today,
   doneToday,
   weekCount,
   motivation,
+  schedule,
+  startsOn,
 }: {
   defaultYear: number
   defaultMonth: number
   doneDates: string[]
+  missedDates?: string[]
   today: string
   doneToday: boolean
   weekCount: number
   motivation: { text: string; emoji: string }
+  schedule?: ScheduleSlotList
+  startsOn?: string
 }) {
   const [year, setYear] = useState(defaultYear)
   const [month, setMonth] = useState(defaultMonth)
@@ -58,6 +65,13 @@ export function MonthCalendar({
   const [workouts, setWorkouts] = useState<DayWorkout[] | null>(null)
 
   const doneDateSet = useMemo(() => new Set(doneDates), [doneDates])
+  const missedDateSet = useMemo(() => new Set(missedDates), [missedDates])
+
+  function isRest(dateStr: string): boolean {
+    if (!schedule || schedule.length === 0) return false
+    if (startsOn && dateStr < startsOn) return false
+    return slotForDate(schedule, startsOn ?? '', dateStr).kind === REST
+  }
 
   const maxReached = view === 'year'
     ? year >= defaultYear
@@ -76,6 +90,11 @@ export function MonthCalendar({
   function isDone(y: number, m: number, day: number): boolean {
     const dateStr = `${y}-${pad(m + 1)}-${pad(day)}`
     return doneDateSet.has(dateStr) || (dateStr === today && doneToday)
+  }
+
+  function isMissed(y: number, m: number, day: number): boolean {
+    const dateStr = `${y}-${pad(m + 1)}-${pad(day)}`
+    return missedDateSet.has(dateStr) && !isDone(y, m, day)
   }
 
   function selectDate(y: number, m: number, day: number) {
@@ -237,8 +256,11 @@ export function MonthCalendar({
                     ))}
                     {Array.from({ length: dim }).map((_, i) => {
                       const day = i + 1
+                      const dateStr = `${year}-${pad(m + 1)}-${pad(day)}`
                       const done = isDone(year, m, day)
-                      const isToday = `${year}-${pad(m + 1)}-${pad(day)}` === today
+                      const missed = isMissed(year, m, day)
+                      const rest = !done && !missed && isRest(dateStr)
+                      const isToday = dateStr === today
                       return (
                         <button
                           key={day}
@@ -249,7 +271,11 @@ export function MonthCalendar({
                               ? 'bg-lime-400 font-bold text-zinc-950'
                               : isToday
                                 ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
-                                : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
+                                : missed
+                                  ? 'font-bold text-red-400 ring-1 ring-red-500/70'
+                                  : rest
+                                    ? 'bg-zinc-800 text-zinc-500'
+                                    : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
                           }`}
                         >
                           {day}
@@ -267,6 +293,9 @@ export function MonthCalendar({
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full ring-1 ring-lime-400/60" /> Today
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full ring-1 ring-red-500/70" /> Missed training day
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2.5 w-2.5 rounded-full bg-zinc-800" /> Rest
@@ -290,6 +319,8 @@ export function MonthCalendar({
             const day = i + 1
             const dateStr = `${year}-${pad(month + 1)}-${pad(day)}`
             const done = doneDateSet.has(dateStr) || (dateStr === today && doneToday)
+            const missed = missedDateSet.has(dateStr) && !done
+            const rest = !done && !missed && isRest(dateStr)
             const isSelected = dateStr === selected
             return (
               <button
@@ -304,7 +335,11 @@ export function MonthCalendar({
                       ? 'bg-zinc-100 font-semibold text-zinc-950'
                       : dateStr === today
                         ? 'font-bold text-lime-400 ring-1 ring-lime-400/60'
-                        : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
+                        : missed
+                          ? 'font-bold text-red-400 ring-1 ring-red-500/70'
+                          : rest
+                            ? 'bg-zinc-800 text-zinc-500'
+                            : 'text-zinc-600 hover:bg-zinc-800 hover:text-zinc-200'
                 }`}
               >
                 {day}

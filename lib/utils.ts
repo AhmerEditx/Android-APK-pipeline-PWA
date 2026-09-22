@@ -48,7 +48,24 @@ export function addDays(iso: string, days: number): string {
   return d.toISOString().slice(0, 10)
 }
 
-export function computeWorkoutStreaks(dates: string[]): {
+type GraceSchedule = Array<{ kind: string; planDayId?: string; name?: string }>
+
+function slotKindForDate(
+  schedule: GraceSchedule,
+  startsOn: string,
+  date: string
+): string {
+  if (schedule.length === 0) return 'rest'
+  const daysElapsed = Math.max(daysBetween(startsOn, date), 0)
+  const slotIndex =
+    schedule.length === 7 ? weekdayIndex(date) : daysElapsed % schedule.length
+  return schedule[slotIndex]?.kind ?? 'rest'
+}
+
+export function computeWorkoutStreaks(
+  dates: string[],
+  plan?: { schedule: GraceSchedule; startsOn: string }
+): {
   current: number
   longest: number
 } {
@@ -69,14 +86,47 @@ export function computeWorkoutStreaks(dates: string[]): {
 
   const today = localDateISO()
   const dateSet = new Set(unique)
+
   let current = 0
-  let gaps = 0
-  let d = dateSet.has(today) ? today : addDays(today, -1)
-  while (dateSet.has(d) || gaps < 1) {
-    if (dateSet.has(d)) current++
-    else gaps++
-    d = addDays(d, -1)
+  if (plan && plan.schedule.length > 0) {
+    current = scheduleAwareCurrentStreak(plan.schedule, plan.startsOn, today, dateSet)
+  } else {
+    let gaps = 0
+    let d = dateSet.has(today) ? today : addDays(today, -1)
+    while (dateSet.has(d) || gaps < 2) {
+      if (dateSet.has(d)) current++
+      else gaps++
+      d = addDays(d, -1)
+    }
   }
 
   return { current, longest }
+}
+
+function scheduleAwareCurrentStreak(
+  schedule: GraceSchedule,
+  startsOn: string,
+  today: string,
+  dateSet: Set<string>
+): number {
+  const GRACE_DAYS = 2
+  const lower =
+    startsOn > addDays(today, -400) ? startsOn : addDays(today, -400)
+  let current = 0
+  let d = today
+  while (d >= lower) {
+    const kind = slotKindForDate(schedule, startsOn, d)
+    if (kind === 'rest') {
+      d = addDays(d, -1)
+      continue
+    }
+    const daysSince = daysBetween(d, today)
+    if (dateSet.has(d)) {
+      current++
+    } else if (daysSince > GRACE_DAYS) {
+      break
+    }
+    d = addDays(d, -1)
+  }
+  return current
 }

@@ -11,8 +11,9 @@ import {
   type UserPlanExerciseRow,
 } from '@/lib/plan-exercises'
 import { createClient, requireUser } from '@/lib/supabase/server'
+import { fetchExerciseCatalog } from '@/lib/exercise-catalog'
 import { REST, defaultScheduleForDays, nextTrainingSlot, type ScheduleSlotList } from '@/lib/schedule'
-import { addDays, daysBetween, localDateISO, weekdayIndex } from '@/lib/utils'
+import { addDays, daysBetween, formatDate, localDateISO, weekdayIndex } from '@/lib/utils'
 
 type ActivePlanRow = {
   id: string
@@ -51,9 +52,15 @@ type LastAttemptRow = {
 
 export const metadata = { title: "Today's Workout" }
 
-export default async function TodayPage() {
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string }>
+}) {
   const supabase = await createClient()
   const user = await requireUser()
+
+  const requestedDate = (await searchParams).date ?? ''
 
   const { data: active } = await supabase
     .from('user_plans')
@@ -85,13 +92,18 @@ export default async function TodayPage() {
 
   const row = active as unknown as ActivePlanRow
   const today = localDateISO()
-  const daysElapsed = Math.max(daysBetween(row.starts_on, today), 0)
+  const targetDate =
+    requestedDate && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) && requestedDate <= today
+      ? requestedDate
+      : today
+  const restoring = targetDate !== today
+  const daysElapsed = Math.max(daysBetween(row.starts_on, targetDate), 0)
 
   const [
     { data: planDaysData },
     { data: userExData },
     { data: lastAttempts },
-    { data: catalogData },
+    catalog,
     { data: todayWorkout },
   ] = await Promise.all([
     supabase
@@ -109,16 +121,16 @@ export default async function TodayPage() {
       .from('workouts')
       .select('date, workout_exercises(exercise_id, sets(weight_kg, reps, is_warmup))')
       .eq('user_id', user.id)
-      .lt('date', today)
-      .gte('date', addDays(today, -13))
+      .lt('date', targetDate)
+      .gte('date', addDays(targetDate, -13))
       .order('date', { ascending: false })
       .limit(30),
-    supabase.from('exercises').select('id, name, muscle_group, equipment, primary_muscle').order('name'),
+    fetchExerciseCatalog(supabase),
     supabase
       .from('workouts')
       .select('id, date')
       .eq('user_id', user.id)
-      .eq('date', today)
+      .eq('date', targetDate)
       .maybeSingle(),
   ])
 
@@ -152,8 +164,12 @@ export default async function TodayPage() {
   }
 
   const slotIndex =
-    schedule.length === 7 ? weekdayIndex(today) : daysElapsed % schedule.length
+    schedule.length === 7 ? weekdayIndex(targetDate) : daysElapsed % schedule.length
   const slot = schedule[slotIndex]
+
+  const slotLabel = restoring
+    ? formatDate(targetDate)
+    : null
 
   if (slot.kind === REST) {
     const next = nextTrainingSlot(schedule, slotIndex)
@@ -306,6 +322,17 @@ export default async function TodayPage() {
 
   return (
     <div>
+      {restoring ? (
+        <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-300">
+            Restoring the workout for {slotLabel}
+          </p>
+          <p className="mt-0.5 text-xs text-amber-400/80">
+            Logging an earlier missed session. Save when done, or{' '}
+<Link href="/today" className="underline underline-offset-2">go to today&apos;s workout</Link>.{'\n'}
+            </p>
+        </div>
+      ) : null}
       <PageHeader
         title="Today's workout"
         description={`${row.plans.name} · ${day.name}`}
@@ -323,13 +350,14 @@ export default async function TodayPage() {
         dayName={day.name}
         currentExercises={exercises}
         templateByDay={templateByDay}
-        catalog={(catalogData ?? []) as unknown as CatalogExercise[]}
+        catalog={catalog as unknown as CatalogExercise[]}
       />
       <TodayChecklist
         planDayId={day.id}
         dayName={day.name}
-        today={today}
+        today={targetDate}
         exercises={todaysExercises}
+        restoring={restoring}
       />
     </div>
   )

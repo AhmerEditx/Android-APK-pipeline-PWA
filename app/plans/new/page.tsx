@@ -2,6 +2,7 @@ import { CustomPlanBuilder } from '@/components/custom-plan-builder'
 import type { CatalogExercise } from '@/components/plan-exercises-editor'
 import { PageHeader } from '@/components/ui'
 import { createClient, requireUser } from '@/lib/supabase/server'
+import { fetchExerciseCatalog } from '@/lib/exercise-catalog'
 
 export const metadata = { title: 'Create a Plan' }
 
@@ -25,7 +26,7 @@ export default async function NewPlanPage() {
   const supabase = await createClient()
   await requireUser()
 
-  const [{ data: templatesData }, { data: catalogData }] = await Promise.all([
+  const [{ data: templatesData }, catalog] = await Promise.all([
     supabase
       .from('plans')
       .select(
@@ -33,10 +34,7 @@ export default async function NewPlanPage() {
       )
       .eq('is_public', true)
       .order('days_count'),
-    supabase
-      .from('exercises')
-      .select('id, name, muscle_group, equipment, primary_muscle')
-      .order('name'),
+    fetchExerciseCatalog(supabase),
   ])
 
   const templates = ((templatesData ?? []) as unknown as TemplateRow[])
@@ -69,7 +67,7 @@ export default async function NewPlanPage() {
       />
       <CustomPlanBuilder
         templates={templates}
-        catalog={(catalogData ?? []) as unknown as CatalogExercise[]}
+        catalog={catalog as unknown as CatalogExercise[]}
       />
     </div>
   )

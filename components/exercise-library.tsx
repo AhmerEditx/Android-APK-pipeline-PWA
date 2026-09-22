@@ -5,13 +5,23 @@ import type { Exercise } from '@/lib/supabase/types'
 import { IFBB_TOP3, ifbbRankFor } from '@/lib/ifbb-rankings'
 import { EXERCISE_MEDIA_BASE, mediaFor } from '@/lib/exercise-media'
 import { Badge, Card, EmptyState, Input, PageHeader } from '@/components/ui'
+import { ExerciseDemoModal } from './exercise-demo-modal'
+import { ExerciseAddSheet, type AddTarget } from './exercise-add-sheet'
+import { PlusIcon } from './icons'
 
-export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
+export function ExerciseLibrary({
+  exercises,
+  addTarget,
+}: {
+  exercises: Exercise[]
+  addTarget: AddTarget | null
+}) {
   const [query, setQuery] = useState('')
   const [muscleFilter, setMuscleFilter] = useState<string | null>(null)
   const [subFilter, setSubFilter] = useState<string | null>(null)
   const [showRanks, setShowRanks] = useState(false)
-  const [openId, setOpenId] = useState<string | null>(null)
+  const [demo, setDemo] = useState<Exercise | null>(null)
+  const [adding, setAdding] = useState<Exercise | null>(null)
 
   const muscleGroups = useMemo(
     () => Array.from(new Set(exercises.map((e) => e.muscle_group))).sort(),
@@ -171,13 +181,12 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
           {filtered.map((exercise) => {
             const rank = ifbbRankFor(exercise.muscle_group, exercise.name)
             const media = mediaFor(exercise.id)
-            const open = openId === exercise.id
             return (
               <Card key={exercise.id} className="overflow-hidden p-0">
                 <button
                   type="button"
-                  onClick={() => setOpenId(open ? null : exercise.id)}
-                  aria-expanded={open}
+                  onClick={() => setDemo(exercise)}
+                  aria-expanded={false}
                   className="flex w-full items-center justify-between gap-3 p-4 text-left transition-colors hover:bg-zinc-800/40"
                 >
                   <div className="flex min-w-0 items-center gap-3">
@@ -210,32 +219,40 @@ export function ExerciseLibrary({ exercises }: { exercises: Exercise[] }) {
                   </div>
                 </button>
 
-                {open ? (
-                  <div className="border-t border-zinc-800/80 bg-zinc-900/40 p-4">
-                    {media ? (
-                      <img
-                        src={`${EXERCISE_MEDIA_BASE}${media.gif}`}
-                        alt={`${exercise.name} demo`}
-                        loading="lazy"
-                        width={120}
-                        height={120}
-                        className="mb-3 h-28 w-28 rounded-lg border border-zinc-800 bg-zinc-950 object-cover"
-                      />
-                    ) : null}
-                    {exercise.instructions ? (
-                      <p className="text-sm leading-relaxed text-zinc-300">
-                        {exercise.instructions}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-zinc-500">No instructions available.</p>
-                    )}
-                  </div>
-                ) : null}
+                <div className="flex items-center justify-between gap-2 border-t border-zinc-800/80 bg-zinc-900/40 px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setDemo(exercise)}
+                    className="text-xs font-medium text-zinc-500 transition-colors hover:text-lime-300"
+                  >
+                    How to do it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdding(exercise)}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-lime-400 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition-colors hover:bg-lime-300"
+                  >
+                    <PlusIcon className="h-3.5 w-3.5" />
+                    Add to workout
+                  </button>
+                </div>
               </Card>
             )
           })}
         </div>
       )}
+
+      {demo ? (
+        <ExerciseDemoModal exercise={demo} onClose={() => setDemo(null)} />
+      ) : null}
+      {adding ? (
+        <ExerciseAddSheet
+          exerciseName={adding.name}
+          exerciseId={adding.id}
+          addTarget={addTarget}
+          onClose={() => setAdding(null)}
+        />
+      ) : null}
     </div>
   )
 }

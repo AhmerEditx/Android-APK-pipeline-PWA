@@ -146,11 +146,13 @@ export function TodayChecklist({
   dayName,
   today,
   exercises,
+  restoring = false,
 }: {
   planDayId: string
   dayName: string
   today: string
   exercises: TodaysExercises
+  restoring?: boolean
 }) {
   const router = useRouter()
   const [date, setDate] = useState(today)
@@ -307,7 +309,9 @@ export function TodayChecklist({
       <Card className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
         <p className="text-lg font-semibold text-zinc-200">Workout saved 🎉</p>
         <p className="max-w-sm text-sm text-zinc-500">
-          Nice work on {dayName}. Come back tomorrow for the next day of your plan.
+          {restoring
+            ? `Nice work on ${dayName}. You&apos;ve caught up on your missed session.`
+            : `Nice work on ${dayName}. Come back tomorrow for the next day of your plan.`}
         </p>
         <div className="mt-2 flex items-center gap-2">
           <Button variant="secondary" onClick={() => router.push(`/history/${savedId}`)}>

@@ -10,6 +10,7 @@ import {
   type UserPlanExerciseRow,
 } from '@/lib/plan-exercises'
 import { createClient, requireUser } from '@/lib/supabase/server'
+import { fetchExerciseCatalog } from '@/lib/exercise-catalog'
 
 type PlanDetailRow = {
   id: string
@@ -60,7 +61,7 @@ export default async function PlanDetailPage({
     .eq('active', true)
     .maybeSingle()
 
-  const [{ data: userExData }, { data: catalogData }] = await Promise.all([
+  const [{ data: userExData }, catalog] = await Promise.all([
     active
       ? supabase
           .from('user_plan_exercises')
@@ -69,10 +70,7 @@ export default async function PlanDetailPage({
           )
           .eq('user_plan_id', active.id)
       : Promise.resolve({ data: null }),
-    supabase
-      .from('exercises')
-      .select('id, name, muscle_group, equipment, primary_muscle')
-      .order('name'),
+    fetchExerciseCatalog(supabase),
   ])
 
   const userRows = (userExData ?? []) as unknown as UserPlanExerciseRow[]
@@ -120,7 +118,7 @@ export default async function PlanDetailPage({
           days={days.map((d) => ({ id: d.id, position: d.position, name: d.name }))}
           currentByDay={currentByDay}
           templateByDay={templateByDay}
-          catalog={(catalogData ?? []) as unknown as CatalogExercise[]}
+          catalog={(catalog as unknown as CatalogExercise[])}
         />
       </div>
     </div>

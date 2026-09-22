@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { createClient, requireUser } from '@/lib/supabase/server'
-import { formatDate, computeWorkoutStreaks, startOfWeek, localDateISO, daysBetween, weekdayIndex } from '@/lib/utils'
-import { REST, defaultScheduleForDays, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
+import { formatDate, computeWorkoutStreaks, startOfWeek, localDateISO, daysBetween, weekdayIndex, addDays } from '@/lib/utils'
+import { REST, defaultScheduleForDays, slotForDate, type ScheduleSlot, type ScheduleSlotList } from '@/lib/schedule'
 import { Badge, Card, EmptyState, LinkButton, PageHeader } from '@/components/ui'
 import { DeleteWorkoutButton } from '@/components/delete-workout-button'
 import { MonthCalendar } from '@/components/month-calendar'
@@ -62,7 +62,9 @@ export default async function DashboardPage() {
     supabase
       .from('user_plans')
       .select('id, starts_on, schedule, plans(id, name, days_count)')
+      .eq('user_id', user.id)
       .eq('active', true)
+      .order('created_at', { ascending: false })
       .maybeSingle(),
     supabase
       .from('workouts')
@@ -74,9 +76,7 @@ export default async function DashboardPage() {
   const firstName =
     profile?.full_name?.split(' ')[0] ??
     (user.email ? user.email.split('@')[0] : 'Athlete')
-  const streaks = computeWorkoutStreaks(
-    (allDateRows ?? []).map((r) => r.date)
-  )
+  const dateRows = (allDateRows ?? []).map((r) => r.date)
   const recentRows = (recent ?? []) as unknown as RecentRow[]
   const plan = (activePlan ?? null) as unknown as UserPlanRow | null
   const doneToday = (todayWorkout ?? null) as unknown as TodayWorkoutRow | null
@@ -90,6 +90,8 @@ export default async function DashboardPage() {
 
   let planLabel = 'Training plan'
   let dayLabel = 'Training day'
+  let planSchedule: ScheduleSlotList = []
+  let planStartsOn = ''
   if (plan) {
     const shortName = plan.plans?.name?.match(/^\d+-Day/i)?.[0] ?? null
     planLabel = shortName ? `${shortName} Plan` : plan.plans?.name ?? 'Training plan'
@@ -107,11 +109,13 @@ export default async function DashboardPage() {
         ? saved
         : defaultScheduleForDays(planDayRows, plan.plans?.days_count ?? 3)
 
+    planSchedule = schedule
+    planStartsOn = plan.starts_on
+
     if (schedule.length > 0) {
       const daysElapsed = Math.max(daysBetween(plan.starts_on, today), 0)
-      const slotIndex =
-        schedule.length === 7 ? weekdayIndex(today) : daysElapsed % schedule.length
-      const slot = schedule[slotIndex] as ScheduleSlot
+      const index = schedule.length === 7 ? weekdayIndex(today) : daysElapsed % schedule.length
+      const slot = schedule[index] as ScheduleSlot
       if (slot.kind === REST) {
         dayLabel = 'Rest day'
       } else if (slot.kind === 'custom') {
@@ -121,6 +125,10 @@ export default async function DashboardPage() {
       }
     }
   }
+
+  const planParam =
+    planSchedule.length > 0 ? { schedule: planSchedule, startsOn: planStartsOn } : undefined
+  const streaks = computeWorkoutStreaks(dateRows, planParam)
 
   const quotes = [
     { text: 'The only bad workout is the one that didn\u2019t happen.', emoji: '🔥' },
@@ -146,6 +154,19 @@ export default async function DashboardPage() {
   const year = new Date().getFullYear()
   const month = new Date().getMonth()
   const doneDates = (allDateRows ?? []).map((r) => r.date)
+  const doneDateSet = new Set(doneDates)
+
+  const missedDates: string[] = []
+  if (planSchedule.length > 0) {
+    let current = planStartsOn > addDays(today, -60) ? planStartsOn : addDays(today, -60)
+    while (current <= today) {
+      const slot = slotForDate(planSchedule, planStartsOn, current)
+      if (slot.kind !== REST && !doneDateSet.has(current)) {
+        missedDates.push(current)
+      }
+      current = addDays(current, 1)
+    }
+  }
 
   const spotlights = [
     {
@@ -222,21 +243,61 @@ export default async function DashboardPage() {
                 {dayLabel} &middot; {planLabel}
               </p>
               <div className="mt-3 flex gap-1.5">
-                {weekDays.map((d, i) => (
-                  <span
-                    key={d}
-                    className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold ${
-                      i === todayIdx
-                        ? 'bg-lime-400 text-zinc-950'
-                        : i < todayIdx
-                          ? 'bg-zinc-800 text-zinc-500'
-                          : 'bg-zinc-900 text-zinc-600'
-                    }`}
-                  >
-                    {d[0]}
-                  </span>
-                ))}
+                {weekDays.map((d, i) => {
+                  const date = addDays(weekStart, i)
+                  const isToday = i === todayIdx
+                  const isPast = date < today
+                  const isRest =
+                    planSchedule.length > 0 &&
+                    slotForDate(planSchedule, planStartsOn, date).kind === REST
+                  const isDone = doneDateSet.has(date)
+                  const isMissed =
+                    isPast && !isDone && !isRest && missedDates.includes(date)
+                  const cls = isToday
+                    ? 'bg-lime-400 text-zinc-950'
+                    : isMissed
+                      ? 'bg-zinc-900 text-red-400 ring-1 ring-red-500/70'
+                      : isRest
+                        ? 'bg-zinc-800 text-zinc-400 ring-1 ring-zinc-600/50'
+                        : isDone
+                          ? 'bg-lime-400/20 text-lime-300'
+                          : isPast
+                            ? 'bg-zinc-800 text-zinc-500'
+                            : 'bg-zinc-900 text-zinc-600'
+                  return (
+                    <span
+                      key={d}
+                      title={
+                        isRest
+                          ? 'Rest day'
+                          : isMissed
+                            ? 'Missed training day'
+                            : isDone
+                              ? 'Workout done'
+                              : isToday
+                                ? 'Today'
+                                : d
+                      }
+                      className={`flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold ${cls}`}
+                    >
+                      {d[0]}
+                    </span>
+                  )
+                })}
               </div>
+              {planSchedule.length > 0 ? (
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-zinc-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-800 ring-1 ring-zinc-600/50" /> Rest
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-zinc-900 ring-1 ring-red-500/70" /> Missed
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-lime-400/20 ring-1 ring-lime-400/50" /> Done
+                  </span>
+                </div>
+              ) : null}
             </div>
             <div className="flex w-24 items-center justify-center bg-lime-400/10">
               {doneToday ? (
@@ -296,10 +357,13 @@ export default async function DashboardPage() {
         defaultYear={year}
         defaultMonth={month}
         doneDates={doneDates}
+        missedDates={missedDates}
         today={today}
         doneToday={Boolean(doneToday)}
         weekCount={weekCount}
         motivation={motivation}
+        schedule={planSchedule.length > 0 ? planSchedule : undefined}
+        startsOn={planStartsOn || undefined}
       />
 
       {/* Exercise spotlight */}

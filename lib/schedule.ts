@@ -1,3 +1,5 @@
+import { daysBetween, weekdayIndex } from '@/lib/utils'
+
 export const REST = 'rest'
 
 export type ScheduleSlot =
@@ -61,4 +63,16 @@ export function nextTrainingSlot(
     if (schedule[index].kind !== REST) return { slot: schedule[index], index }
   }
   return null
+}
+
+export function slotForDate(
+  schedule: ScheduleSlotList,
+  startsOn: string,
+  date: string
+): ScheduleSlot {
+  if (schedule.length === 0) return { kind: REST }
+  const daysElapsed = Math.max(daysBetween(startsOn, date), 0)
+  const slotIndex =
+    schedule.length === 7 ? weekdayIndex(date) : daysElapsed % schedule.length
+  return schedule[slotIndex] ?? { kind: REST }
 }
